@@ -1,5 +1,5 @@
 {
-  "name": "chrome-extension-starter",
+  "name": "fake-news-reader",
   "version": "1.0.0",
   "description": "Chrome Extension with React and TypeScript using WXT",
   "type": "module",

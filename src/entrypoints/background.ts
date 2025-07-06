@@ -4,84 +4,76 @@ import { fetchCohere } from '../utils/aiHandling'
 import { fetchMistral7B } from '../utils/aiHandling'
 import { fetchMixtral8x7B } from '../utils/aiHandling'
 import { fetchLlama } from '../utils/aiHandling'
-import { defineBackground } from '#imports'
+import { defineBackground } from 'wxt/utils/define-background'
 
 export default defineBackground({
   main() {
-    // Example: Listen for extension installation
     chrome.runtime.onInstalled.addListener(() => {
       console.log('Extension installed')
     })
 
-    // Example: Listen for messages
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === 'GET_PAGE_INFO') {
         (async () => {
-        try {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-          const pageInfo = await chrome.tabs.sendMessage(tab.id!, { type: 'GET_PAGE_CONTENT'})
-          if (pageInfo && pageInfo.error) {
-            sendResponse({ success: false, error: pageInfo.error })
-            return
-          } else {
-            sendResponse({ success: true, data: pageInfo })
-            chrome.storage.local.set({ pageInfo: pageInfo })
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+            if (!tab?.id) {
+              sendResponse({ success: false, error: 'No active tab found' });
+              return;
+            }
+
+            const pageInfo = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT'})
+            if (pageInfo && pageInfo.error) {
+              sendResponse({ success: false, error: pageInfo.error })
+              return
+            }
+
+            // Make sure we're sending the correct data structure
+            if (pageInfo.success && pageInfo.data) {
+              sendResponse({ success: true, data: pageInfo.data })
+            } else {
+              sendResponse({ success: false, error: 'Invalid page info format' })
+            }
+          } catch (error) {
+            sendResponse({ success: false, error: 'Failed to fetch page info' })
           }
-        } catch (error) {
-          console.error('Error fetching page info:', error)
-          sendResponse({ success: false, error: 'Failed to fetch page info' })
-        }
-      })()
+        })()
+      } else if (message.type === 'ANALYZE_ARTICLE') {
+        (async () => {
+          try {
+            const providers = message.providers || []
+            const results = await Promise.allSettled(
+              providers.map(async (provider: string) => {
+                switch (provider) {
+                  case 'OpenAI':
+                    return await fetchOpenAI(message.content, import.meta.env.VITE_OPENAI_API_KEY || '')
+                  case 'Gemini':
+                    return await fetchGemini(message.content, import.meta.env.VITE_GEMINI_API_KEY || '')
+                  case 'Cohere':
+                    return await fetchCohere(message.content, import.meta.env.VITE_COHERE_API_KEY || '')
+                  case 'Mistral7B':
+                    return await fetchMistral7B(message.content, import.meta.env.VITE_HUGGINGFACE_API_KEY || '')
+                  case 'Mixtral8x7B':
+                    return await fetchMixtral8x7B(message.content, import.meta.env.VITE_HUGGINGFACE_API_KEY || '')
+                  case 'Llama':
+                    return await fetchLlama(message.content, import.meta.env.VITE_HUGGINGFACE_API_KEY || '')
+                  default:
+                    throw new Error(`Unknown provider: ${provider}`)
+                }
+              })
+            )
+            
+            sendResponse({
+              success: true,
+              data: results,
+              providers: providers
+            })
+          } catch (error) {
+            sendResponse({ success: false, error: 'Failed to analyze article' })
+          }
+        })()
       }
       return true
-    })
-
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'ANALYZE_ARTICLE') {
-        const { content, providers } = message
-        const tasks: Promise<any>[] = []
-        
-        for (const provider of providers) {
-          if (provider === 'Openai') {
-            tasks.push(fetchOpenAI(content, import.meta.env.VITE_OPENAI_API_KEY || ''))
-          }
-          else if (provider === 'Gemini') {
-            tasks.push(fetchGemini(content, import.meta.env.VITE_GEMINI_API_KEY || '').then(response => {
-              console.log('🔮 Gemini response:', response);
-              return response;
-            }))
-          }
-          else if (provider === 'Cohere') {
-            tasks.push(fetchCohere(content, import.meta.env.VITE_COHERE_API_KEY || '').then(response => {
-              console.log('🧠 Cohere response:', response);
-              return response;
-            }))
-          }
-          else if (provider === 'Mistral'){
-            tasks.push(fetchMistral7B(content, import.meta.env.VITE_HUGGINGFACE_API_KEY || ''))
-          }
-          else if (provider === 'Mixtral'){
-            tasks.push(fetchMixtral8x7B(content, import.meta.env.VITE_HUGGINGFACE_API_KEY || ''))
-          }
-          else if (provider === 'Llama') {
-            tasks.push(fetchLlama(content, import.meta.env.VITE_HUGGINGFACE_API_KEY || '').then(response => {
-              console.log('🦙 Llama response:', response);
-              return response;
-            }))
-          }
-        }
-        
-       Promise.allSettled(tasks)
-       .then(results => {
-        sendResponse({ success: true, data: results, providers })
-       })
-       .catch(error => {
-        console.error('Analysis failed:', error);
-        sendResponse({ success: false, error: 'Analysis failed' })
-       })
-       
-       return true
-      } 
     })
   }
 });

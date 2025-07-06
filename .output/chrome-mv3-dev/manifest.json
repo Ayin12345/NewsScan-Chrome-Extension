@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Fake News Reader",
-  "description": "Chrome extension that analyzes web articles for credibility using multiple AI providers",
+  "name": "fake-news-reader",
+  "description": "Chrome Extension with React and TypeScript using WXT",
   "version": "1.0.0",
   "permissions": [
     "storage",
@@ -19,6 +19,10 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Fake News Reader",
+    "default_popup": "popup.html"
   },
   "host_permissions": [
     "<all_urls>",
