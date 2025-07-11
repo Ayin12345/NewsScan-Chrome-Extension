@@ -1,18 +1,46 @@
 .container {
-  padding: 20px;
+  width: 400px;
+  min-height: 300px;
+  max-height: 600px;
+  padding: 16px 20px;
+  background-color: white;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
+  background: white;
 }
 
 .title {
-  font-size: 24px;
-  margin-bottom: 20px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
 }
 
 .error {
-  color: red;
+  color: #dc3545;
+  padding: 8px 12px;
+  background-color: #fff5f5;
+  border-radius: 4px;
+  margin: 10px 0;
 }
 
 .button {
-  /* Original button had no specific styling */
+  padding: 8px 16px;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
 }
 
 .button:hover {
@@ -20,6 +48,27 @@
 }
 
 .pageTitle {
-  font-size: 20px;
-  margin: 15px 0;
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 16px 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+/* Custom scrollbar */
+.container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background: #555;
 } 

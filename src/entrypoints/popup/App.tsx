@@ -193,33 +193,46 @@ function App() {
   }
 
   return (
-    <div>
-      <h1>My Chrome Extension</h1>
-      <button onClick={getPageInfo}>New Analysis</button>
-      {error && <p className={styles.error}>{error}</p>}
-      {pageInfo && 
-        <div>
-          <h2>Title: {pageInfo.title || 'No title found'}</h2>
-          
-          <PageDetails 
-            pageInfo={pageInfo}
-            isExpanded={isPageDetailsExpanded}
-            onToggle={() => setIsPageDetailsExpanded(!isPageDetailsExpanded)}
-          />
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Fake News Reader</h1>
+        <button className={styles.button} onClick={getPageInfo}>
+          New Analysis
+        </button>
+      </div>
 
-          {showButton && <button onClick={analyzeArticle}>Analyze Article</button>}
-          
-          {analysis.length > 0 && 
-            <AnalysisResults 
-              analysis={analysis}
-              selectedProvider={selectedProvider}
-              onProviderSelect={setSelectedProvider}
+      <div className={styles.content}>
+        {error && <p className={styles.error}>{error}</p>}
+        {pageInfo && (
+          <>
+            <h2 className={styles.pageTitle}>
+              {pageInfo.title || 'No title found'}
+            </h2>
+            
+            <PageDetails 
+              pageInfo={pageInfo}
+              isExpanded={isPageDetailsExpanded}
+              onToggle={() => setIsPageDetailsExpanded(!isPageDetailsExpanded)}
             />
-          }
-          
-          <FailedProviders providers={failedProviders} />
-        </div>
-      }
+
+            {showButton && (
+              <button className={styles.button} onClick={analyzeArticle}>
+                Analyze Article
+              </button>
+            )}
+            
+            {analysis.length > 0 && (
+              <AnalysisResults 
+                analysis={analysis}
+                selectedProvider={selectedProvider}
+                onProviderSelect={setSelectedProvider}
+              />
+            )}
+            
+            <FailedProviders providers={failedProviders} />
+          </>
+        )}
+      </div>
     </div>
   );
 }
