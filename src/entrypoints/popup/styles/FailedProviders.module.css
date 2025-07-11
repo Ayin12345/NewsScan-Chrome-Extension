@@ -1,0 +1,16 @@
+.container {
+  margin-top: 20px;
+}
+
+.providerItem {
+  margin-bottom: 15px;
+}
+
+.providerName {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.errorMessage {
+  color: red;
+} 

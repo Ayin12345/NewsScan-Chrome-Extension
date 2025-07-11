@@ -1,0 +1,25 @@
+.container {
+  padding: 20px;
+}
+
+.title {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.error {
+  color: red;
+}
+
+.button {
+  /* Original button had no specific styling */
+}
+
+.button:hover {
+  background-color: #0052a3;
+}
+
+.pageTitle {
+  font-size: 20px;
+  margin: 15px 0;
+} 
