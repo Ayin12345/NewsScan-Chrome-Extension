@@ -51,36 +51,52 @@ export async function fetchGemini(content: string, apiKey: string) {
 }
 
 export async function fetchLlama(content: string, apiKey: string) {
-    const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            inputs: content,
-            parameters: {
-                max_new_tokens: 500,
-                temperature: 0.7,
-                return_full_text: false
-            }
-        })
-    });
+    console.log('Llama API Key:', apiKey ? 'Present' : 'Missing');
+    console.log('API Key length:', apiKey.length);
+    
+    try {
+        const response = await fetch('https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                inputs: content,
+                parameters: {
+                    max_new_tokens: 500,
+                    temperature: 0.7,
+                    return_full_text: false
+                }
+            })
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Llama API error: ${response.status} ${response.statusText} - ${errorText}`);
+        console.log('Llama Response Status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Llama API Full Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+            throw new Error(`Llama API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Llama API Response Data:', data);
+
+        if (Array.isArray(data) && data[0]?.generated_text) {
+            return data[0].generated_text;
+        }
+
+        console.error('Llama API Invalid Response Format:', data);
+        throw new Error(data.error || 'No valid response from Llama');
+    } catch (error) {
+        console.error('Llama API Call Failed:', error);
+        throw error;
     }
-
-    const data = await response.json();
-
-    // HuggingFace typically returns this format:
-    // [{ generated_text: "..." }]
-    if (Array.isArray(data) && data[0]?.generated_text) {
-        return data[0].generated_text;
-    }
-
-    throw new Error(data.error || 'No valid response from Llama');
 }
 
 //add gemini in later, need to be 18+ 
@@ -111,64 +127,93 @@ export async function fetchCohere(content: string, apiKey: string) {
 }
 
 export async function fetchMistral7B(content: string, apiKey: string) {
-    const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            inputs: content,
-            parameters: {
-                max_new_tokens: 500,
-                temperature: 0.7,
-                return_full_text: false
-            }
-        })
-    });
+    try {
+        const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                inputs: content,
+                parameters: {
+                    max_new_tokens: 500,
+                    temperature: 0.7,
+                    return_full_text: false
+                }
+            })
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Mistral API error: ${response.status} ${response.statusText} - ${errorText}`);
+        console.log('Mistral Response Status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Mistral API Full Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+            throw new Error(`Mistral API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Mistral API Response Data:', data);
+
+        if (Array.isArray(data) && data[0]?.generated_text) {
+            return data[0].generated_text;
+        }
+
+        console.error('Mistral API Invalid Response Format:', data);
+        throw new Error(data.error || 'No valid response from Mistral 7B');
+    } catch (error) {
+        console.error('Mistral API Call Failed:', error);
+        throw error;
     }
-
-    const data = await response.json();
-
-    // HuggingFace typically returns this format:
-    // [{ generated_text: "..." }]
-    if (Array.isArray(data) && data[0]?.generated_text) {
-        return data[0].generated_text;
-    }
-
-    throw new Error(data.error || 'No valid response from Mistral 7B');
 }
 
 export async function fetchMixtral8x7B(content: string, apiKey: string) {
-    const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-            inputs: content,
-            parameters: {
-                max_new_tokens: 500,
-                temperature: 0.7,
-                return_full_text: false
-            }
-        })
-    });
+    try {
+        const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                inputs: content,
+                parameters: {
+                    max_new_tokens: 500,
+                    temperature: 0.7,
+                    return_full_text: false
+                }
+            })
+        });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Mixtral API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-    
-    const data = await response.json();
-    if (Array.isArray(data) && data[0] && data[0].generated_text) {
-        return data[0].generated_text;    
-    } else {
+        console.log('Mixtral Response Status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Mixtral API Full Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+            throw new Error(`Mixtral API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Mixtral API Response Data:', data);
+
+        if (Array.isArray(data) && data[0] && data[0].generated_text) {
+            return data[0].generated_text;    
+        }
+
+        console.error('Mixtral API Invalid Response Format:', data);
         throw new Error(data.error || 'No response from Mixtral 8x7B');
+    } catch (error) {
+        console.error('Mixtral API Call Failed:', error);
+        throw error;
     }
 }

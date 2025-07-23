@@ -94,17 +94,15 @@ export default defineContentScript({
             .replace(/\n\s*\n/g, '\n')      
             .trim();
             
-            console.log('Content after cleaning:', content.length, 'chars');
-            console.log('First 200 chars after cleaning:', content.substring(0, 200));
             
             const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
             
             console.log('Word count:', wordCount, 'Link count:', linkCount);
-            console.log('Content preview (first 300 chars):', content.substring(0, 300));
+            console.log('Content:', content);
             
             // 3. Check word and link count constraints - relaxed link limit
             if (wordCount < 100 || linkCount > 35 || wordCount > 1250) {
-              sendResponse({error: "Not a valid article: must have 100-1250 words and no more than 35 content links."});
+              sendResponse({error: "Not a valid article: must have 100-1250 words and no more than 35 content links. This article has " + wordCount + " words and " + linkCount + " links."});
               return true;
             }
 

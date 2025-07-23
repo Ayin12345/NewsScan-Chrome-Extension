@@ -8,7 +8,14 @@ export default defineConfig({
       "storage",
       "scripting",
       "activeTab",
-      "tabs"
-    ]
+      "tabs",
+      "sidePanel"
+    ],
+    action: {
+      default_title: "Open Fake News Reader"
+    },
+    side_panel: {
+      default_path: "sidepanel.html"
+    }
   }
 }); 

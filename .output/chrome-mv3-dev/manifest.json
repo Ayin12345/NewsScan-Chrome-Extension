@@ -7,8 +7,15 @@
     "storage",
     "scripting",
     "activeTab",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
+  "action": {
+    "default_title": "Open Fake News Reader"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "commands": {
     "wxt:reload-extension": {
       "description": "Reload the extension during development",
@@ -19,10 +26,6 @@
   },
   "background": {
     "service_worker": "background.js"
-  },
-  "action": {
-    "default_title": "Fake News Reader",
-    "default_popup": "popup.html"
   },
   "host_permissions": [
     "<all_urls>",
