@@ -6,6 +6,82 @@ import { fetchMixtral8x7B } from '../utils/aiHandling'
 import { fetchLlama } from '../utils/aiHandling'
 import { defineBackground } from 'wxt/utils/define-background'
 
+// Add this helper function at the top of the file
+function cleanAndParseJSON(text: string) {
+  try {
+    // First try direct JSON parse
+    return JSON.parse(text);
+  } catch (e) {
+    // If that fails, try to clean and extract JSON
+    try {
+      // Remove any leading/trailing non-JSON content
+      let jsonStr = text.trim();
+      
+      // Find the first { and last }
+      const startIdx = jsonStr.indexOf('{');
+      const endIdx = jsonStr.lastIndexOf('}') + 1;
+      if (startIdx >= 0 && endIdx > startIdx) {
+        jsonStr = jsonStr.slice(startIdx, endIdx);
+      }
+
+      // Clean up common formatting issues
+      jsonStr = jsonStr
+        .replace(/\\n/g, ' ')           // Replace \n with space
+        .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+        .replace(/"\s*,\s*}/g, '"}')    // Remove trailing commas
+        .replace(/,(\s*})/g, '$1')      // Remove trailing commas in objects
+        .replace(/\.,/g, '.')           // Fix ".," issues
+        .replace(/\."/g, '"')           // Fix trailing periods in strings
+        .replace(/"\s*\.\s*$/g, '"')    // Fix trailing periods after quotes
+        .replace(/\[\s*,/g, '[')        // Fix leading commas in arrays
+        .replace(/,\s*\]/g, ']');       // Fix trailing commas in arrays
+
+      const parsed = JSON.parse(jsonStr);
+
+      // Clean up the parsed object
+      if (parsed.credibility_summary) {
+        parsed.credibility_summary = parsed.credibility_summary
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/\.,/g, '.')
+          .replace(/\.+$/, '.');
+      }
+
+      if (parsed.reasoning) {
+        parsed.reasoning = parsed.reasoning
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/\.,/g, '.')
+          .replace(/\.+$/, '.');
+      }
+
+      if (Array.isArray(parsed.evidence_sentences)) {
+        parsed.evidence_sentences = parsed.evidence_sentences.map((evidence: any) => ({
+          quote: evidence.quote?.trim().replace(/\s+/g, ' ').replace(/\.+$/, '') || '',
+          impact: evidence.impact?.trim().replace(/\s+/g, ' ').replace(/\.+$/, '') || ''
+        })).filter((e: any) => e.quote && e.impact);
+      }
+
+      if (Array.isArray(parsed.supporting_links)) {
+        parsed.supporting_links = parsed.supporting_links
+          .map((link: string) => link.trim())
+          .filter(Boolean);
+      }
+
+      // Ensure credibility_score is a number between 1-100
+      if (typeof parsed.credibility_score === 'string') {
+        parsed.credibility_score = parseInt(parsed.credibility_score, 10);
+      }
+      parsed.credibility_score = Math.max(1, Math.min(100, parsed.credibility_score || 0));
+
+      return parsed;
+    } catch (e2) {
+      console.error('Failed to parse cleaned JSON:', e2);
+      throw new Error('Invalid JSON format');
+    }
+  }
+}
+
 // Add web search function
 async function performWebSearch(query: string, maxResults: number = 5) {
   try {
@@ -124,32 +200,17 @@ async function performWebSearch(query: string, maxResults: number = 5) {
   }
 }
 
-interface TabState {
-  pageInfo: {
-    title: string;
-    content: string;
-    url: string;
-    wordCount: number;
-  } | null;
-  analysis: Array<{
-    provider: string;
-    result: {
-      credibility_score: number;
-      credibility_summary: string;
-      reasoning: string;
-      evidence_sentences: Array<{
-        quote: string;
-        impact: string;
-      }>;
-      supporting_links: string[];
-    };
-  }>;
+// Add this type definition if not already present
+type TabState = {
+  pageInfo: any;
+  analysis: any[];
   failedProviders: string[];
   showButton: boolean;
-  isAnalyzing: boolean; // Track analyzing state per tab
-}
+  isAnalyzing: boolean;
+  hasAttemptedAnalysis: boolean;
+};
 
-// Store states for all tabs
+// Update or add the state management
 const tabStates = new Map<number, TabState>();
 
 // Get default state for a new tab
@@ -158,7 +219,8 @@ const getDefaultState = (): TabState => ({
   analysis: [],
   failedProviders: [],
   showButton: true,
-  isAnalyzing: false
+  isAnalyzing: false,
+  hasAttemptedAnalysis: false
 });
 
 export default defineBackground({
@@ -213,23 +275,26 @@ export default defineBackground({
 
     // Message handler
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      // Get tab ID from message or sender
+      const tabId = message.tabId || sender.tab?.id;
+      
+      if (!tabId) {
+        console.error('No tab ID found in message or sender');
+        sendResponse({ success: false, error: 'No tab ID found' });
+        return true;
+      }
+
       if (message.type === 'GET_PAGE_INFO') {
         (async () => {
           try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-            if (!tab?.id) {
-              sendResponse({ success: false, error: 'No active tab found' });
+            const pageInfo = await chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_CONTENT' });
+            if (pageInfo && pageInfo.error) {
+              sendResponse({ success: false, error: pageInfo.error });
               return;
             }
 
-            const pageInfo = await chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_CONTENT'})
-            if (pageInfo && pageInfo.error) {
-              sendResponse({ success: false, error: pageInfo.error })
-              return
-            }
-
             // Get or create state for this tab
-            let state = tabStates.get(tab.id) || getDefaultState();
+            let state = tabStates.get(tabId) || getDefaultState();
             
             // Update state with new page info, but preserve existing analysis if page is the same
             const isSamePage = state.pageInfo?.url === pageInfo.data.url;
@@ -238,37 +303,38 @@ export default defineBackground({
               ...state,
               pageInfo: pageInfo.data,
               showButton: true,
-              // Only clear analysis if it's a different page
               analysis: isSamePage ? state.analysis : [],
-              failedProviders: isSamePage ? state.failedProviders : []
+              failedProviders: isSamePage ? state.failedProviders : [],
+              hasAttemptedAnalysis: false
             };
             
             // Save state
-            tabStates.set(tab.id, state);
+            tabStates.set(tabId, state);
 
-            sendResponse({ success: true, data: pageInfo.data })
+            sendResponse({ success: true, data: pageInfo.data });
           } catch (error) {
-            sendResponse({ success: false, error: 'Failed to fetch page info' })
+            console.error('Error getting page info:', error);
+            sendResponse({ success: false, error: 'Failed to fetch page info' });
           }
-        })()
+        })();
         return true;
       } 
       
       if (message.type === 'ANALYZE_ARTICLE') {
         (async () => {
           try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab?.id) {
-              sendResponse({ success: false, error: 'No active tab found' });
+            const tabId = message.tabId;
+            if (!tabId) {
+              sendResponse({ success: false, error: 'No tab ID provided' });
               return;
             }
 
-            const providers = message.providers || []
+            const providers = message.providers || [];
             
             // Set analyzing state for this tab
-            let currentState = tabStates.get(tab.id) || getDefaultState();
+            let currentState = tabStates.get(tabId) || getDefaultState();
             currentState.isAnalyzing = true;
-            tabStates.set(tab.id, currentState);
+            tabStates.set(tabId, currentState);
             
             // Debug: Log the providers array
             console.log('Providers array received:', providers);
@@ -344,61 +410,36 @@ export default defineBackground({
                     let parsedResult;
                     if (typeof r.value === 'string') {
                       try {
-                        parsedResult = JSON.parse(r.value);
+                        parsedResult = cleanAndParseJSON(r.value);
                       } catch (e) {
-                        const scoreMatch = r.value.match(/credibility_score["\s:]+(\d+)/);
-                        const summaryMatch = r.value.match(/credibility_summary["\s:]+(.+?)(?=reasoning|supporting_links|evidence_sentences|$)/s);
-                        const reasoningMatch = r.value.match(/reasoning["\s:]+(.+?)(?=supporting_links|evidence_sentences|$)/s);
-                        const evidenceMatch = r.value.match(/evidence_sentences["\s:]+\[(.*?)\]/s);
-                        const linksMatch = r.value.match(/supporting_links["\s:]+\[(.*?)\]/s);
-                        
-                        // Parse evidence sentences with their impact
-                        let evidenceSentences: Array<{ quote: string; impact: string }> = [];
-                        if (evidenceMatch) {
-                          const evidenceContent = evidenceMatch[1];
-                          // Match each evidence object in the array
-                          const evidenceObjects = evidenceContent.match(/\{[^{}]*\}/g) || [];
-                          evidenceSentences = evidenceObjects.map((obj: string) => {
-                            try {
-                              const parsed = JSON.parse(obj);
-                              return {
-                                quote: parsed.quote?.trim().replace(/['"]+/g, '') || '',
-                                impact: parsed.impact?.trim().replace(/['"]+/g, '') || ''
-                              };
-                            } catch (e: unknown) {
-                              // Fallback for simpler format
-                              const quoteMatch = obj.match(/quote["\s:]+([^,}]+)/);
-                              const impactMatch = obj.match(/impact["\s:]+([^,}]+)/);
-                              return {
-                                quote: quoteMatch ? quoteMatch[1].trim().replace(/['"]+/g, '') : '',
-                                impact: impactMatch ? impactMatch[1].trim().replace(/['"]+/g, '') : ''
-                              };
-                            }
-                          }).filter((e: { quote: string; impact: string }) => e.quote && e.impact);
-                        }
-                        
-                        parsedResult = {
-                          credibility_score: scoreMatch ? parseInt(scoreMatch[1]) : 0,
-                          credibility_summary: summaryMatch ? summaryMatch[1].trim().replace(/['"]+/g, '').replace(/[.,]+$/, '') : 'No summary provided',
-                          reasoning: reasoningMatch ? reasoningMatch[1].trim().replace(/['"]+/g, '').replace(/[.,]+$/, '') : r.value,
-                          evidence_sentences: evidenceSentences,
-                          supporting_links: linksMatch ? 
-                            linksMatch[1].split(',')
-                              .map((link: string) => link.trim().replace(/['"]+/g, ''))
-                              .filter((link: string) => link.length > 0) : []
-                        };
+                        console.error('Failed to parse result:', e);
+                        return null;
                       }
                     } else {
                       parsedResult = r.value;
                     }
 
-                    if (!parsedResult) return null;
+                    if (!parsedResult) {
+                      console.error('No parsed result available');
+                      return null;
+                    }
+
+                    // Validate the structure
+                    if (typeof parsedResult.credibility_score !== 'number' ||
+                        typeof parsedResult.credibility_summary !== 'string' ||
+                        typeof parsedResult.reasoning !== 'string' ||
+                        !Array.isArray(parsedResult.evidence_sentences) ||
+                        !Array.isArray(parsedResult.supporting_links)) {
+                      console.error('Invalid result structure:', parsedResult);
+                      return null;
+                    }
 
                     return {
                       provider: providers[i],
                       result: parsedResult
                     };
                   } catch (e) {
+                    console.error(`Error processing result from provider ${providers[i]}:`, e);
                     return null;
                   }
                 }
@@ -420,7 +461,7 @@ export default defineBackground({
               .filter((x): x is string => x !== null);
 
             // Update tab state with analysis results
-            let state = tabStates.get(tab.id);
+            let state = tabStates.get(tabId);
             if (!state) {
               // If no state exists, create default but we need to preserve pageInfo
               // This shouldn't happen in normal flow, but let's handle it
@@ -432,6 +473,7 @@ export default defineBackground({
             state.failedProviders = failedProviders;
             state.showButton = false;
             state.isAnalyzing = false; // Analysis is complete
+            state.hasAttemptedAnalysis = true; // Mark analysis as attempted
             
             // Debug: Log the analysis being saved
             console.log('Saving analysis state:', successfulResults);
@@ -440,7 +482,7 @@ export default defineBackground({
               console.log(`Saving - Analysis ${idx}:`, result.provider, result.result.credibility_summary);
             });
             
-            tabStates.set(tab.id, state);
+            tabStates.set(tabId, state);
             
             sendResponse({
               success: true,
@@ -448,47 +490,39 @@ export default defineBackground({
               providers: providers
             })
           } catch (error) {
-            sendResponse({ success: false, error: 'Failed to analyze article' })
+            console.error('Error in analyze article:', error);
+            sendResponse({ success: false, error: 'Failed to analyze article' });
           }
-        })()
+        })();
         return true;
       }
 
       if (message.type === 'GET_TAB_STATE') {
-        (async () => {
-          try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab?.id) {
-              sendResponse({ success: false, error: 'No active tab found' });
-              return;
-            }
-
-            // Get or create state for this tab
-            const state = tabStates.get(tab.id) || getDefaultState();
-            sendResponse({ success: true, data: state });
-          } catch (error) {
-            sendResponse({ success: false, error: 'Failed to get tab state' });
-          }
-        })()
+        const state = tabStates.get(tabId) || getDefaultState();
+        sendResponse({ success: true, data: state });
         return true;
       }
 
       if (message.type === 'RESET_TAB_STATE') {
-        (async () => {
-          try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab?.id) {
-              sendResponse({ success: false, error: 'No active tab found' });
-              return;
-            }
-
-            // Reset state for this tab only
-            tabStates.set(tab.id, getDefaultState());
-            sendResponse({ success: true });
-          } catch (error) {
-            sendResponse({ success: false, error: 'Failed to reset tab state' });
-          }
-        })()
+        // Clear the state completely
+        tabStates.delete(tabId);
+        // Initialize with default state
+        tabStates.set(tabId, {
+          pageInfo: null,
+          analysis: [],
+          failedProviders: [],
+          showButton: true,
+          isAnalyzing: false,
+          hasAttemptedAnalysis: false
+        });
+        // Notify other instances of the sidepanel about the reset
+        chrome.tabs.sendMessage(tabId, {
+          type: 'TAB_SWITCHED',
+          state: tabStates.get(tabId)
+        }).catch(() => {
+          // Ignore errors if content script isn't ready
+        });
+        sendResponse({ success: true });
         return true;
       }
 
@@ -507,7 +541,8 @@ export default defineBackground({
               analysis: message.data.analysis,
               failedProviders: message.data.failedProviders,
               showButton: message.data.showButton,
-              isAnalyzing: message.data.isAnalyzing || false
+              isAnalyzing: message.data.isAnalyzing || false,
+              hasAttemptedAnalysis: message.data.hasAttemptedAnalysis || false
             });
             
             sendResponse({ success: true });
@@ -545,5 +580,20 @@ export default defineBackground({
 
       return true;
     })
+
+    // Handle tab updates
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === 'complete') {
+        // Reset state when navigating to a new page
+        tabStates.set(tabId, {
+          pageInfo: null,
+          analysis: [],
+          failedProviders: [],
+          showButton: true,
+          isAnalyzing: false,
+          hasAttemptedAnalysis: false
+        });
+      }
+    });
   }
 });

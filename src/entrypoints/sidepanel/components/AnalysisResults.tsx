@@ -36,42 +36,44 @@ const getScoreRange = (results: AnalysisResult[]): { min: number; max: number } 
   };
 };
 
-// Collect unique evidence from all AIs
 const getAllEvidence = (results: AnalysisResult[]) => {
-  const evidenceMap = new Map<string, { impact: string; providers: string[] }>();
+  const evidenceMap = new Map<string, { impact: string; providers: string[]; sentiment: 'positive' | 'negative' | 'neutral' }>();
   
   results.forEach(result => {
-    // Add null check for evidence_sentences
     if (result.result.evidence_sentences && Array.isArray(result.result.evidence_sentences)) {
       result.result.evidence_sentences.forEach(evidence => {
         const existing = evidenceMap.get(evidence.quote);
+        // Determine sentiment based on impact text
+        const sentiment = evidence.impact.toLowerCase().includes('concern') || 
+                         evidence.impact.toLowerCase().includes('problem') ||
+                         evidence.impact.toLowerCase().includes('issue') ? 'negative' : 'positive';
+        
         if (existing) {
           existing.providers.push(result.provider);
         } else {
           evidenceMap.set(evidence.quote, {
             impact: evidence.impact,
-            providers: [result.provider]
+            providers: [result.provider],
+            sentiment
           });
         }
       });
     }
   });
 
-  // Convert to array and sort by number of providers citing it
   return Array.from(evidenceMap.entries())
     .map(([quote, data]) => ({
       quote,
       impact: data.impact,
-      providers: data.providers
+      providers: data.providers,
+      sentiment: data.sentiment
     }))
     .sort((a, b) => b.providers.length - a.providers.length);
 };
 
-// Collect all unique supporting links
 const getAllLinks = (results: AnalysisResult[]): string[] => {
   const uniqueLinks = new Set<string>();
   results.forEach(result => {
-    // Add null check for supporting_links
     if (result.result.supporting_links && Array.isArray(result.result.supporting_links)) {
       result.result.supporting_links.forEach(link => uniqueLinks.add(link));
     }
@@ -80,15 +82,14 @@ const getAllLinks = (results: AnalysisResult[]): string[] => {
 };
 
 const getScoreCategory = (score: number) => {
-  if (score >= 85) return { text: 'Highly Credible', class: styles.scoreHigh };
-  if (score >= 70) return { text: 'Credible', class: styles.scoreMedium };
-  if (score >= 50) return { text: 'Somewhat Credible', class: styles.scoreMediumLow };
-  return { text: 'Low Credibility', class: styles.scoreLow };
+  if (score >= 80) return { text: 'Excellent', class: styles.scoreExcellent };
+  if (score >= 60) return { text: 'Good', class: styles.scoreGood };
+  if (score >= 40) return { text: 'Fair', class: styles.scoreFair };
+  if (score >= 20) return { text: 'Poor', class: styles.scorePoor };
+  return { text: 'Very Poor', class: styles.scoreVeryPoor };
 };
 
-// Get a balanced summary from all AI responses
 const getBalancedSummary = (results: AnalysisResult[]): string => {
-  // Use the response with score closest to average for base summary
   const avgScore = calculateAverageScore(results);
   const mainResponse = results.reduce((closest, current) => {
     const currentDiff = Math.abs(current.result.credibility_score - avgScore);
@@ -99,13 +100,13 @@ const getBalancedSummary = (results: AnalysisResult[]): string => {
   return mainResponse.result.credibility_summary;
 };
 
+type TabType = 'overview' | 'evidence' | 'analysis' | 'sources';
+
 export const AnalysisResults: React.FC<AnalysisResultsProps> = ({ 
   analysis
 }) => {
-  const [showDetails, setShowDetails] = useState(false);
-  const [showAllEvidence, setShowAllEvidence] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   
-  // Add safety check for analysis array
   if (!analysis || !Array.isArray(analysis) || analysis.length === 0) {
     return (
       <div className={styles.container}>
@@ -121,118 +122,156 @@ export const AnalysisResults: React.FC<AnalysisResultsProps> = ({
   const allEvidence = getAllEvidence(analysis);
   const allLinks = getAllLinks(analysis);
   const scoreCategory = getScoreCategory(averageScore);
-  
-  const displayedEvidence = showAllEvidence ? allEvidence : allEvidence.slice(0, 3);
+  const balancedSummary = getBalancedSummary(analysis);
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <div className={styles.overviewContent}>
+            <div className={styles.summaryCard}>
+              <p className={styles.summaryText}>{balancedSummary}</p>
+            </div>
+            
+            <div className={styles.quickStats}>
+              <div className={styles.statCard}>
+                <div className={styles.statValue}>{analysis.length}</div>
+                <div className={styles.statLabel}>AI Models</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statValue}>{allEvidence.length}</div>
+                <div className={styles.statLabel}>Key Quotes</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statValue}>{allLinks.length}</div>
+                <div className={styles.statLabel}>Sources</div>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statValue}>{scoreRange.min}-{scoreRange.max}</div>
+                <div className={styles.statLabel}>Score Range</div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'evidence':
+        return (
+          <div className={styles.evidenceList}>
+            {allEvidence.map((evidence, idx) => (
+              <div key={idx} className={`${styles.evidenceCard} ${styles[evidence.sentiment]}`}>
+                <div className={styles.quote}>{evidence.quote}</div>
+                <div className={styles.impact}>{evidence.impact}</div>
+                <div className={styles.providers}>
+                  Cited by: {evidence.providers.join(', ')}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'analysis':
+        return (
+          <div className={styles.analysisContent}>
+            {analysis.map((result, idx) => (
+              <div key={idx} className={styles.aiCard}>
+                <div className={styles.aiHeader}>
+                  <div className={styles.aiName}>{result.provider}</div>
+                  <div className={styles.aiScore}>{result.result.credibility_score}/100</div>
+                </div>
+                <div className={styles.aiContent}>
+                  <p className={styles.aiReasoning}>
+                    {result.result.reasoning || 'No detailed reasoning available'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'sources':
+        return (
+          <div className={styles.sourcesList}>
+            {allLinks.length > 0 ? (
+              allLinks.map((link, idx) => (
+                <div key={idx} className={styles.sourceCard}>
+                  {link.startsWith('http') ? (
+                    <a 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.open(link, '_blank');
+                      }}
+                      className={styles.sourceLink}
+                    >
+                      {link}
+                    </a>
+                  ) : (
+                    <span className={styles.sourceLink}>{link}</span>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p style={{ color: '#5f6368', textAlign: 'center', padding: '40px' }}>
+                No sources available for verification.
+              </p>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className={styles.container}>
-
-      {/* Main Score Section */}
-      <div className={`${styles.scoreContainer} ${scoreCategory.class}`}>
-        <div className={styles.scoreHeader}>
-          <div className={styles.scoreMain}>
-            <h2>Credibility</h2>
-            <div className={styles.scoreCategory}>{scoreCategory.text}</div>
-          </div>
-          <div className={styles.scoreInfo}>
-            <div className={styles.scoreDisplay}>
-              <span className={styles.scoreValue}>{averageScore}</span>
-              <span className={styles.scoreMax}>/100</span>
-            </div>
-            <span className={styles.scoreRange}>
-              (range: {scoreRange.min}-{scoreRange.max})
-            </span>
-          </div>
+      {/* Left Side - Score Display */}
+      <div className={`${styles.scoreSection} ${scoreCategory.class}`}>
+        <div 
+          className={styles.scoreRing}
+          style={{
+            '--score-percentage': averageScore
+          } as React.CSSProperties}
+        >
+          <div className={styles.scoreValue}>{averageScore}</div>
         </div>
-        <div className={styles.summaries}>
-          {analysis.map((result, idx) => (
-            <p key={idx} className={styles.summary}>
-              <span className={styles.aiTag}>{result.provider}:</span> 
-              {result.result.credibility_summary && result.result.credibility_summary.trim() ? 
-                result.result.credibility_summary : 
-                <span style={{fontStyle: 'italic', color: '#666'}}>No summary available</span>
-              }
-            </p>
-          ))}
-        </div>
+        <div className={styles.scoreLabel}>{scoreCategory.text}</div>
+        <div className={styles.scoreRange}>Range: {scoreRange.min}-{scoreRange.max}</div>
       </div>
 
-      {/* Key Evidence */}
-      <div className={styles.section}>
-        <h3>Key Evidence</h3>
-        <ul className={styles.evidenceList}>
-          {displayedEvidence.map((evidence, idx) => (
-            <li key={idx} className={styles.evidenceItem}>
-              <div className={styles.quote}>"{evidence.quote}"</div>
-              <div className={styles.impact}>{evidence.impact}</div>
-              <div className={styles.providers}>
-                Cited by: {evidence.providers.join(', ')}
-              </div>
-            </li>
-          ))}
-        </ul>
-        {allEvidence.length > 3 && (
+      {/* Right Side - Navigation & Content */}
+      <div className={styles.mainSection}>
+        <div className={styles.navigation}>
           <button 
-            className={styles.moreButton}
-            onClick={() => setShowAllEvidence(!showAllEvidence)}
+            className={`${styles.navTab} ${activeTab === 'overview' ? styles.active : ''}`}
+            onClick={() => setActiveTab('overview')}
           >
-            {showAllEvidence ? 'Show Less' : `Show ${allEvidence.length - 3} More`}
+            Overview
           </button>
-        )}
+          <button 
+            className={`${styles.navTab} ${activeTab === 'evidence' ? styles.active : ''}`}
+            onClick={() => setActiveTab('evidence')}
+          >
+            Evidence ({allEvidence.length})
+          </button>
+          <button 
+            className={`${styles.navTab} ${activeTab === 'analysis' ? styles.active : ''}`}
+            onClick={() => setActiveTab('analysis')}
+          >
+            Analysis ({analysis.length})
+          </button>
+          <button 
+            className={`${styles.navTab} ${activeTab === 'sources' ? styles.active : ''}`}
+            onClick={() => setActiveTab('sources')}
+          >
+            Sources ({allLinks.length})
+          </button>
+        </div>
+
+        <div className={styles.contentArea}>
+          {renderTabContent()}
+        </div>
       </div>
-
-      {/* Supporting Links */}
-      {allLinks.length > 0 && (
-        <div className={styles.section}>
-          <h3>Alternative Sources</h3>
-          <ul className={styles.linkList}>
-            {allLinks.map((link, idx) => (
-              <li key={idx}>
-                {link.startsWith('http') ? (
-                  <a 
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open(link, '_blank');
-                    }}
-                    className={styles.link}
-                  >
-                    {link}
-                  </a>
-                ) : (
-                  <span className={styles.errorMessage}>
-                    {link}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Detailed Analysis Toggle */}
-      <button 
-        className={styles.detailsToggle}
-        onClick={() => setShowDetails(!showDetails)}
-      >
-        {showDetails ? 'Hide Detailed Analysis' : 'Show Detailed Analysis'}
-      </button>
-
-      {/* Detailed Analysis Section */}
-      {showDetails && (
-        <div className={styles.detailedAnalysis}>
-          <h3>Individual AI Assessments</h3>
-          {analysis.map((result, idx) => (
-            <div key={idx} className={styles.aiResponse}>
-              <div className={styles.aiHeader}>
-                <span className={styles.aiName}>{result.provider}</span>
-                <span className={styles.aiScore}>{result.result.credibility_score}/100</span>
-              </div>
-              <p className={styles.aiReasoning}>{result.result.reasoning}</p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }; 

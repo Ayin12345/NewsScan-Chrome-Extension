@@ -60,8 +60,10 @@ export const PageDetails: React.FC<PageDetailsProps> = ({ pageInfo }) => {
   const contentQuality = getContentQuality();
   const contentLength = getContentLength();
 
-  // Get content snippet (first 200 characters)
-  const contentSnippet = pageInfo.content ? pageInfo.content.substring(0, 200) + '...' : 'No content available';
+  // Get content snippet (reduced to 750 characters to ensure no scroll)
+  const contentSnippet = pageInfo.content 
+    ? pageInfo.content.substring(0, 750).trim() + '...' 
+    : 'No content available';
 
   return (
     <div className={styles.container}>
@@ -98,7 +100,10 @@ export const PageDetails: React.FC<PageDetailsProps> = ({ pageInfo }) => {
       </div>
 
       {/* Interactive Content Preview */}
-      <div className={styles.contentPreview}>
+      <div 
+        className={styles.contentPreview}
+        data-expanded={isContentExpanded}
+      >
         <div className={styles.contentHeader}>
           <h3 className={styles.contentTitle}>Article Preview</h3>
           <button 

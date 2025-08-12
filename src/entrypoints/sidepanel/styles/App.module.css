@@ -66,9 +66,11 @@
 .content {
   flex: 1;
   padding: 20px;
-  padding-bottom: 80px; /* Account for fixed analyze button */
+  padding-bottom: calc(20px + 70px); /* Account for fixed analyze button */
   overflow-y: auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .error {
@@ -251,148 +253,200 @@
   position: absolute;
   width: 100%;
   height: 100%;
-  border: 3px solid transparent;
+  border: 3px solid #e8f0fe;
+  border-top: 3px solid #1a73e8;
   border-radius: 50%;
-  animation: modernSpin 2s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
-.spinnerRing:nth-child(1) {
-  border-top-color: #1a73e8;
-  animation-delay: 0s;
-}
-
-.spinnerRing:nth-child(2) {
-  border-right-color: #1a73e8;
-  animation-delay: 0.3s;
-  transform: scale(0.8);
-}
-
+.spinnerRing:nth-child(2),
 .spinnerRing:nth-child(3) {
-  border-bottom-color: #1a73e8;
-  animation-delay: 0.6s;
-  transform: scale(0.6);
+  display: none;
 }
 
-/* AI Provider Status Indicators */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* AI Provider Status Cards */
 .aiProviders {
+  margin-top: 2rem;
   display: flex;
-  flex-direction: row;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin: 24px auto 0;
-  max-width: 320px;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 400px;
 }
 
+/* Default state */
 .providerStatus {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(26, 115, 232, 0.1);
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 0.9rem;
   color: #202124;
-  min-width: 70px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
+/* Base background for all states */
+.providerStatus::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 12px;
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
+  pointer-events: none;
+}
+
+/* Analyzing state - blue background */
+.providerStatus.analyzing {
+  background: rgba(26, 115, 232, 0.1);
+  border-color: rgba(26, 115, 232, 0.3);
+}
+
+/* Complete state - green background */
 .providerStatus.complete {
   background: rgba(52, 168, 83, 0.1);
   border-color: rgba(52, 168, 83, 0.3);
 }
 
+/* Failed state - red background */
 .providerStatus.failed {
   background: rgba(234, 67, 53, 0.1);
   border-color: rgba(234, 67, 53, 0.3);
 }
 
+/* Remove any existing animations */
+.providerStatus.analyzing,
+.providerStatus.complete,
+.providerStatus.failed {
+  animation: none;
+}
+
+.providerStatus.analyzing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(26, 115, 232, 0.1), transparent 70%);
+  animation: radialPulse 1.8s ease-in-out infinite;
+}
+
+.providerStatus.complete::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(52, 168, 83, 0.1), transparent 70%);
+  animation: radialPulse 1.8s ease-in-out infinite;
+}
+
+.providerStatus.failed::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(234, 67, 53, 0.1), transparent 70%);
+  animation: radialPulse 1.8s ease-in-out infinite;
+}
+
+/* Ensure content stays above the gradient */
+.providerName, .statusDot {
+  position: relative;
+  z-index: 1;
+}
+
 .providerName {
   font-weight: 500;
-  font-size: 10px;
-  letter-spacing: 0.3px;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
 }
 
 .statusDot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  margin-left: 1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .statusWaiting {
   background-color: #dadce0;
+  box-shadow: 0 0 0 2px rgba(218, 220, 224, 0.3);
 }
 
 .statusAnalyzing {
+  --dot-color: 26, 115, 232;
   background-color: #1a73e8;
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.4);
+  animation: dotPulse 1.8s ease-in-out infinite;
 }
 
 .statusComplete {
+  --dot-color: 52, 168, 83;
   background-color: #34a853;
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(52, 168, 83, 0.4);
+  animation: dotPulse 1.8s ease-in-out infinite;
 }
 
 .statusFailed {
+  --dot-color: 234, 67, 53;
   background-color: #ea4335;
-  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(234, 67, 53, 0.4);
+  animation: dotPulse 1.8s ease-in-out infinite;
 }
 
-
-/* Typewriter Effect */
-.typewriterContainer {
-  margin-top: 24px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@keyframes dotPulse {
+  0% { 
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 2px rgba(var(--dot-color), 0.4);
+  }
+  50% { 
+    opacity: 0.7;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px rgba(var(--dot-color), 0.25);
+  }
+  100% { 
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 2px rgba(var(--dot-color), 0.4);
+  }
 }
 
-.typewriterText {
-  font-size: 12px;
-  color: #5f6368;
-  font-family: 'SF Mono', Monaco, monospace;
-  border-right: 2px solid #1a73e8;
-  white-space: nowrap;
-  overflow: hidden;
-  animation: typewriter 2s steps(30) infinite, blink 1s ease-in-out infinite;
-}
-
-.loadingSteps {
-  margin-top: 24px;
-  font-size: 12px;
-  color: #5f6368;
-  animation: fadeInUp 0.6s ease-out 0.4s both;
-}
-
-@keyframes modernSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.1); }
-}
-
-@keyframes typewriter {
-  0% { width: 0; }
-  50% { width: 100%; }
-  100% { width: 0; }
-}
-
-@keyframes blink {
-  0%, 50% { border-color: #1a73e8; }
-  51%, 100% { border-color: transparent; }
-}
-
-@keyframes progressAnimation {
-  0% { width: 0%; }
-  50% { width: 70%; }
-  100% { width: 100%; }
+@keyframes radialPulse {
+  0% {
+    opacity: 1;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(0.95);
+  }
 }
 
 @keyframes fadeInUp {
@@ -405,8 +459,6 @@
     transform: translateY(0);
   }
 }
-
-
 
 .starterScreen {
   text-align: center;
@@ -495,4 +547,167 @@
 .fixedAnalyzeButton .analyzeButton {
   width: 100%;
   margin: 0;
+}
+
+.welcomeContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #f5f7ff 0%, #e8eafd 100%);
+  background-image: 
+    linear-gradient(135deg, rgba(245, 247, 255, 0.97) 0%, rgba(232, 234, 253, 0.97) 100%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231a73e8' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  overflow: hidden;
+  padding-bottom: calc(1.5rem + 70px); /* Adjusted padding for the fixed button */
+}
+
+.logoSection {
+  margin: 2rem 0;
+  /* Removed animation */
+}
+
+.logo {
+  width: 80px;
+  height: auto;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.tagline {
+  font-size: 1.2rem;
+  color: #1a2b4e;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  line-height: 1.4;
+}
+
+.welcomeDescription {
+  font-size: 0.9rem;
+  color: #4a5568;
+  max-width: 600px;
+  margin: 0 auto 1rem;
+  line-height: 1.4;
+  padding: 0 1rem;
+}
+
+.featureCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 800px;
+  margin: 1rem 0;
+  padding: 0 0.5rem;
+}
+
+.featureCard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.featureIcon {
+  font-size: 1.5rem;
+  color: #1a73e8;
+  margin-bottom: 0.25rem;
+}
+
+.featureTitle {
+  font-size: 0.95rem;
+  color: #1a2b4e;
+  font-weight: 600;
+  margin: 0;
+  position: relative;
+}
+
+.featureTitle::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, #1a73e8, #34a853);
+  border-radius: 2px;
+}
+
+.featureDescription {
+  color: #4a5568;
+  line-height: 1.4;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.welcomeFooter {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 1rem;
+  padding: 0 1rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.welcomeFooter p {
+  margin: 0.25rem 0;
+}
+
+.welcomeStartButton {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  padding: 16px 20px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+/* Make the start button match the analyze button */
+.startButton {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  margin: 0;
+}
+
+.startButton:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.startButton:disabled {
+  background-color: #dadce0;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 } 
