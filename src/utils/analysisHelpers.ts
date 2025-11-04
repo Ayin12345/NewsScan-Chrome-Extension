@@ -87,9 +87,9 @@ export function shouldExpandSidebar(
 
 export function getProvidersFromEnvironment(): string[] {
   try {
-    return JSON.parse(import.meta.env.VITE_AI_ROUTERS || '["Cohere"]');
+    return JSON.parse(import.meta.env.VITE_AI_ROUTERS || '["OpenAI","Gemini"]');
   } catch (error) {
     console.warn('Failed to parse VITE_AI_ROUTERS, using fallback:', error);
-    return ["Cohere"];
+    return ["OpenAI", "Gemini"];
   }
 }

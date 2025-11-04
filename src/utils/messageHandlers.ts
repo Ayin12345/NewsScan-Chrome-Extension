@@ -1,6 +1,5 @@
 // Message handlers for background script
-import { fetchOpenAI, fetchGemini } from './aiHandling';
-import { performWebSearch } from './webSearch';
+import { callBackendAnalyze } from './backendClient';
 import { 
   saveTabState, 
   getTabState, 
@@ -12,7 +11,7 @@ import {
   markTabAsBeingSetup,
   unmarkTabAsBeingSetup
 } from './tabState';
-import { processAnalysisResults } from './analysisProcessor';
+import { AnalysisResult } from './analysisProcessor';
 
 export async function handleGetPageInfo(message: any, sender: any, sendResponse: (response: any) => void) {
   try {
@@ -68,61 +67,83 @@ export async function handleAnalyzeArticle(message: any, sender: any, sendRespon
     currentState.isAnalyzing = true;
     await saveTabState(tabId, currentState);
     
-    // Create individual promises that send updates as they complete
-    const providerPromises = providers.map(async (provider: string) => {
+    // Send provider status updates (they'll be set to analyzing)
+    providers.forEach((provider: string) => {
+      chrome.runtime.sendMessage({
+        type: 'PROVIDER_UPDATE',
+        provider: provider,
+        status: 'analyzing'
+      });
+    });
+    
+    // Extract supporting links from prompt if present
+    const supportingLinksMatch = message.content.match(/"supporting_links":\s*\[(.*?)\]/);
+    let supportingLinks = [];
+    if (supportingLinksMatch) {
       try {
-        let result;
-        switch (provider) {
-          case 'OpenAI':
-            result = await fetchOpenAI(message.content, import.meta.env.VITE_OPENAI_API_KEY || '');
-            break;
-          case 'Gemini':
-            result = await fetchGemini(message.content, import.meta.env.VITE_GEMINI_API_KEY || '');
-            break;
-          default:
-            throw new Error(`Unknown provider: ${provider}`);
+        const linksStr = supportingLinksMatch[1];
+        if (linksStr.trim()) {
+          supportingLinks = linksStr.split(',').map(link => 
+            link.trim().replace(/^"|"$/g, '').trim()
+          ).filter(Boolean);
         }
-        
-        // Send success update immediately
-        chrome.runtime.sendMessage({
-          type: 'PROVIDER_UPDATE',
-          provider: provider,
-          status: 'complete'
-        });
-        
-        return result;
-      } catch (error) {
-        console.error(`Error in provider ${provider}:`, error);
-        
-        const errorMessage = error instanceof Error ? error.message : 'Provider failed';
-        
-        // Send failure update immediately with error details
+      } catch (e) {
+        console.warn('Failed to extract supporting links from prompt:', e);
+      }
+    }
+
+    // Call backend API instead of direct API calls
+    const backendResponse = await callBackendAnalyze({
+      prompt: message.content,
+      providers: providers,
+      requestId: Date.now(),
+      supportingLinks: supportingLinks
+    });
+
+    if (!backendResponse.success) {
+      // Mark all providers as failed
+      providers.forEach((provider: string) => {
         chrome.runtime.sendMessage({
           type: 'PROVIDER_UPDATE',
           provider: provider,
           status: 'failed',
-          error: errorMessage
+          error: backendResponse.error || 'Backend request failed'
         });
-        
-        // Update tab state to reflect error
-        let currentState = await getTabState(tabId);
-        if (currentState) {
-          const updatedState = {
-            ...currentState,
-            error: errorMessage,
-            isAnalyzing: false
-          };
-          await saveTabState(tabId, updatedState);
-        }
-        
-        throw error;
+      });
+
+      let state = await getTabState(tabId);
+      if (state) {
+        state.isAnalyzing = false;
+        await saveTabState(tabId, state);
       }
-    });
 
-    const results = await Promise.allSettled(providerPromises);
+      sendResponse({
+        success: false,
+        error: backendResponse.error || 'Failed to analyze article'
+      });
+      return;
+    }
 
-    // Process results
-    const { successfulResults, failedProviders } = processAnalysisResults(results, providers);
+    // Mark successful providers as complete
+    if (backendResponse.data) {
+      backendResponse.data.successfulResults.forEach((result: AnalysisResult) => {
+        chrome.runtime.sendMessage({
+          type: 'PROVIDER_UPDATE',
+          provider: result.provider,
+          status: 'complete'
+        });
+      });
+
+      // Mark failed providers as failed
+      backendResponse.data.failedProviders.forEach((provider: string) => {
+        chrome.runtime.sendMessage({
+          type: 'PROVIDER_UPDATE',
+          provider: provider,
+          status: 'failed',
+          error: 'Provider failed'
+        });
+      });
+    }
 
     // Update tab state with analysis results
     let state = await getTabState(tabId);
@@ -131,8 +152,8 @@ export async function handleAnalyzeArticle(message: any, sender: any, sendRespon
       state = getDefaultState();
     }
     
-    state.analysis = successfulResults;
-    state.failedProviders = failedProviders;
+    state.analysis = backendResponse.data?.successfulResults || [];
+    state.failedProviders = backendResponse.data?.failedProviders || [];
     state.showButton = false;
     state.isAnalyzing = false;
     state.hasAttemptedAnalysis = true;
@@ -142,14 +163,17 @@ export async function handleAnalyzeArticle(message: any, sender: any, sendRespon
     sendResponse({
       success: true,
       data: {
-        successfulResults,
-        failedProviders
+        successfulResults: backendResponse.data?.successfulResults || [],
+        failedProviders: backendResponse.data?.failedProviders || []
       },
       providers: providers
     });
   } catch (error) {
     console.error('Error in analyze article:', error);
-    sendResponse({ success: false, error: 'Failed to analyze article' });
+    sendResponse({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to analyze article' 
+    });
   }
 }
 
@@ -278,19 +302,32 @@ export async function handleSaveTabState(message: any, sender: any, sendResponse
 
 export async function handleWebSearch(message: any, sender: any, sendResponse: (response: any) => void) {
   try {
-    // Combine the query with the original URL to extract year information
-    const searchQuery = message.originalUrl ? `${message.query} ${message.originalUrl}` : message.query;
+    // Use backend for web search instead of direct API calls
+    const { callBackendWebSearch } = await import('./backendClient');
     
-    const results = await performWebSearch(searchQuery, message.max_results);
-    sendResponse({ 
-      success: true, 
-      data: { results } 
+    const backendResponse = await callBackendWebSearch({
+      title: message.query,
+      url: message.originalUrl,
+      limit: message.max_results || 5
+    });
+
+    if (!backendResponse.success || !backendResponse.data) {
+      sendResponse({
+        success: false,
+        error: backendResponse.error || 'Failed to perform web search'
+      });
+      return;
+    }
+
+    sendResponse({
+      success: true,
+      data: { results: backendResponse.data }
     });
   } catch (error) {
     console.error('Web search error:', error);
-    sendResponse({ 
-      success: false, 
-      error: 'Failed to perform web search' 
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to perform web search'
     });
   }
 }

@@ -1,7 +1,7 @@
 import { PageInfo, AnalysisResult } from '../types/analysis';
 import { getProvidersFromEnvironment } from './analysisHelpers';
 import { setStorage, getStorage } from './storage';
-import { performWebSearch } from './webSearch';
+import { callBackendWebSearch } from './backendClient';
 import { buildAnalysisPrompt } from './prompts';
 
 export async function getPageInfo(
@@ -212,36 +212,61 @@ export async function analyzeArticle(
       console.log('[NewsScan] Starting analysis with providers:', providers);
       console.log('[NewsScan] Page info:', pageInfo);
       
-      // Perform web search for supporting links
+      // Perform web search for supporting links using backend
       let webSearchResults: string[] = [];
       try {
         console.log('[NewsScan] Performing web search for supporting links...');
-        // Include URL so webSearch can exclude the current domain
-        const searchQuery = `${pageInfo.title} ${pageInfo.url}`;
-        const searchResponse = await performWebSearch(searchQuery, 5);
+        console.log('[NewsScan] Search request:', {
+          title: pageInfo.title,
+          url: pageInfo.url,
+          limit: 5
+        });
         
-        // Log which search method was used
-        console.log('[NewsScan] Search method used:', searchResponse.searchMethod);
-        console.log('[NewsScan] Query used:', searchResponse.queryUsed);
-        if (searchResponse.aiQueryGenerated) {
-          console.log('[NewsScan] AI generated query:', searchResponse.aiQueryGenerated);
-        }
-        if (searchResponse.fallbackQueryUsed) {
-          console.log('[NewsScan] Fallback query used:', searchResponse.fallbackQueryUsed);
-        }
+        const searchResponse = await callBackendWebSearch({
+          title: pageInfo.title,
+          url: pageInfo.url,
+          limit: 5
+        });
         
-        webSearchResults = searchResponse.results.map(result => result.url);
-        console.log('[NewsScan] Web search found', webSearchResults.length, 'supporting links');
-        console.log('[NewsScan] Search results:', searchResponse.results.map(r => ({ title: r.title, url: r.url })));
+        console.log('[NewsScan] Web search response:', {
+          success: searchResponse.success,
+          hasData: !!searchResponse.data,
+          error: searchResponse.error,
+          resultsCount: searchResponse.data?.results?.length || 0
+        });
         
-        // Warn if using fallback method with bogus results
-        if (searchResponse.searchMethod === 'fallback') {
-          console.warn('[NewsScan] ⚠️  Using fallback search method - results may be less relevant!');
-          console.warn('[NewsScan] AI query that failed:', searchResponse.aiQueryGenerated);
-          console.warn('[NewsScan] Consider checking if the AI-generated query was appropriate for the article');
+        if (searchResponse.success && searchResponse.data) {
+          // Log which search method was used
+          console.log('[NewsScan] Search method used:', searchResponse.data.searchMethod);
+          console.log('[NewsScan] Query used:', searchResponse.data.queryUsed);
+          if (searchResponse.data.aiQueryGenerated) {
+            console.log('[NewsScan] AI generated query:', searchResponse.data.aiQueryGenerated);
+          }
+          if (searchResponse.data.fallbackQueryUsed) {
+            console.log('[NewsScan] Fallback query used:', searchResponse.data.fallbackQueryUsed);
+          }
+          
+          if (searchResponse.data.results && Array.isArray(searchResponse.data.results)) {
+            webSearchResults = searchResponse.data.results.map(result => result.url);
+            console.log('[NewsScan] Web search found', webSearchResults.length, 'supporting links');
+            console.log('[NewsScan] Search results:', searchResponse.data.results.map(r => ({ title: r.title, url: r.url })));
+          } else {
+            console.warn('[NewsScan] Web search returned no results array:', searchResponse.data);
+            webSearchResults = [];
+          }
+          
+          // Warn if using fallback method with bogus results
+          if (searchResponse.data.searchMethod === 'fallback') {
+            console.warn('[NewsScan] ⚠️  Using fallback search method - results may be less relevant!');
+            console.warn('[NewsScan] AI query that failed:', searchResponse.data.aiQueryGenerated);
+            console.warn('[NewsScan] Consider checking if the AI-generated query was appropriate for the article');
+          }
+        } else {
+          console.error('[NewsScan] Web search failed:', searchResponse.error || 'Unknown error');
+          console.error('[NewsScan] Full search response:', searchResponse);
         }
       } catch (searchError) {
-        console.warn('[NewsScan] Web search failed:', searchError);
+        console.error('[NewsScan] Web search exception:', searchError);
         webSearchResults = [];
       }
       
