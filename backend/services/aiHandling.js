@@ -114,12 +114,7 @@ async function fetchGeminiWithModel(content, apiKey, model) {
       // Enable Google Grounding Search for up-to-date information
       // This allows the model to search Google when its knowledge cutoff (Jan 2025) is insufficient
       tools: [{
-        googleSearchRetrieval: {
-          dynamicRetrievalConfig: {
-            mode: 'MODE_DYNAMIC', // Let the model decide when to search
-            dynamicThreshold: 0.7 // Confidence threshold for searching (optional)
-          }
-        }
+        googleSearch: {}
       }]
     };
     
@@ -255,39 +250,38 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 }
 
 export async function fetchGemini(content, apiKey) {
-  // Try Gemini 2.5 Pro first (best for complex analysis with grounding)
-  // If Pro is not available, fall back to 2.5 Flash
-  const primaryModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+  // Primary: Gemini 2.5 Pro (best for complex analysis with grounding)
+  // Secondary: Gemini 2.5 Flash (faster alternative)
+  // Backup: Gemini 2.5 Flash-Lite (lightweight fallback)
+  const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
   let lastError = null;
   
-  for (const model of primaryModels) {
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
     try {
       return await fetchGeminiWithModel(content, apiKey, model);
     } catch (error) {
       lastError = error;
-      logger.warn(`[Backend AI] Gemini ${model} failed, trying next model`);
+      if (i < models.length - 1) {
+        const nextModel = models[i + 1];
+        logger.warn(`[Backend AI] Gemini ${model} failed, trying ${nextModel}`);
+      }
       // Continue to next model
     }
   }
   
-  // Fallback to Gemini 2.5 Lite if primary models fail
-  logger.warn('[Backend AI] Primary Gemini models failed, trying backup model (2.5 Lite)');
-  try {
-    return await fetchGeminiWithModel(content, apiKey, 'gemini-2.5-lite');
-  } catch (backupError) {
-    logger.error('[Backend AI] All Gemini models failed');
-    // Re-throw the last primary error if backup also fails
-    throw createAPIError(
-      ErrorCode.GEMINI_ERROR,
-      'Analysis failed due to AI model limitations. Please try again later.',
-      { 
-        originalError: lastError?.message,
-        backupError: backupError.message,
-        provider: 'Gemini'
-      },
-      // Only retryable if both errors are retryable
-      isRetryableError(lastError) && isRetryableError(backupError)
-    );
-  }
+  logger.error('[Backend AI] All Gemini models failed');
+  // Re-throw the last error
+  throw createAPIError(
+    ErrorCode.GEMINI_ERROR,
+    'Analysis failed due to AI model limitations. Please try again later.',
+    { 
+      originalError: lastError?.message,
+      provider: 'Gemini',
+      modelsAttempted: models
+    },
+    // Retryable if error is retryable
+    isRetryableError(lastError)
+  );
 }
 
