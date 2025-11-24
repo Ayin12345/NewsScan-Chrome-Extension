@@ -1,4 +1,5 @@
 // Error handling utilities and error classification system
+import { logger } from './logger.js';
 
 // Error types
 export const ErrorType = {
@@ -290,13 +291,13 @@ export async function retryOperation(operation, maxRetries = 3, delay = 1000, co
       
       // Calculate exponential backoff delay
       const backoffDelay = delay * Math.pow(2, attempt - 1);
-      console.warn(`[Retry] ${context} Attempt ${attempt}/${maxRetries} failed, retrying in ${backoffDelay}ms...`, error.message);
+      logger.warn(`[Retry] ${context} Attempt ${attempt}/${maxRetries} failed, retrying in ${backoffDelay}ms...`, error.message);
       
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
   }
   
-  console.error(`[Retry] ${context} All ${maxRetries} attempts failed`);
+  logger.error(`[Retry] ${context} All ${maxRetries} attempts failed`);
   throw lastError;
 }
 

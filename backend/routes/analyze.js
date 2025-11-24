@@ -2,16 +2,50 @@ import { fetchOpenAI, fetchGemini } from '../services/aiHandling.js';
 import { processAnalysisResults } from '../services/analysisProcessor.js';
 import { analysisCache, generateCacheKey } from '../services/redisCache.js';
 import { createConfigurationError, createTimeoutError, createProcessingError, ErrorCode } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
+import { buildOpenAIPrompt, buildGeminiPrompt } from '../utils/prompts.js';
 
 export async function analyzeRoute(req, res) {
   try {
-    const { prompt, providers, requestId, supportingLinks } = req.body;
+    // Accept either a pre-built prompt OR individual components to build provider-specific prompts
+    const { prompt, providers, requestId, supportingLinks, url, title, content } = req.body;
+
+    // Extract URL, title, content from prompt if not provided separately
+    let extractedUrl = url;
+    let extractedTitle = title;
+    let extractedContent = content;
+    let extractedSupportingLinks = supportingLinks || [];
+    
+    if (!extractedUrl || !extractedTitle || extractedContent === undefined) {
+      // Try to extract from prompt
+      const urlMatch = prompt.match(/URL:\s*([^\n]+)/);
+      const titleMatch = prompt.match(/TITLE:\s*([^\n]+)/);
+      const contentMatch = prompt.match(/CONTENT:\s*([\s\S]*?)(?:\n\nCRITICAL|$)/);
+      const linksMatch = prompt.match(/"supporting_links":\s*\[(.*?)\]/);
+      
+      extractedUrl = extractedUrl || (urlMatch ? urlMatch[1].trim() : '');
+      extractedTitle = extractedTitle || (titleMatch ? titleMatch[1].trim() : '');
+      extractedContent = extractedContent !== undefined ? extractedContent : (contentMatch ? contentMatch[1].trim() : '');
+      
+      if (linksMatch && !extractedSupportingLinks.length) {
+        try {
+          const linksStr = linksMatch[1];
+          if (linksStr.trim()) {
+            extractedSupportingLinks = linksStr.split(',').map(link => 
+              link.trim().replace(/^"|"$/g, '').trim()
+            ).filter(Boolean);
+          }
+        } catch (e) {
+          logger.warn('Failed to extract links from prompt:', e);
+        }
+      }
+    }
 
     // Generate cache key from request data
     const cacheKey = generateCacheKey('analyze', {
       prompt: prompt.substring(0, 1000), // Use first 1000 chars for cache key
       providers: providers.sort().join(','),
-      supportingLinks: supportingLinks?.sort().join(',') || ''
+      supportingLinks: extractedSupportingLinks.sort().join(',')
     });
 
     // Check cache first
@@ -46,16 +80,29 @@ export async function analyzeRoute(req, res) {
       );
     }
 
+    // Build provider-specific prompts
+    let openAIPrompt = prompt;
+    let geminiPrompt = prompt;
+    
+    if (extractedUrl && extractedTitle && extractedContent !== undefined) {
+      // Build provider-specific prompts with grounding instructions for Gemini
+      openAIPrompt = buildOpenAIPrompt(extractedUrl, extractedTitle, extractedContent, extractedSupportingLinks);
+      geminiPrompt = buildGeminiPrompt(extractedUrl, extractedTitle, extractedContent, extractedSupportingLinks);
+    } else {
+      // If we can't extract components, append grounding instructions to Gemini prompt
+      geminiPrompt = prompt + '\n\nGROUNDING INSTRUCTIONS:\n- Use Google Search to verify current facts, names, dates, and recent events\n- If your knowledge cutoff (January 2025) is insufficient, search Google for up-to-date information\n- Verify official names, titles, and recent changes\n- Do NOT include citation markers (like [1]) or URLs inside the JSON values\n- Do NOT include markdown links or citation indices in the JSON strings\n- Return ONLY clean JSON without groundingMetadata, citations, or any metadata';
+    }
+
     // Create promises for each provider
     const providerPromises = providers.map(async (provider) => {
       try {
         let result;
         switch (provider) {
           case 'OpenAI':
-            result = await fetchOpenAI(prompt, openAIKey);
+            result = await fetchOpenAI(openAIPrompt, openAIKey);
             break;
           case 'Gemini':
-            result = await fetchGemini(prompt, geminiKey);
+            result = await fetchGemini(geminiPrompt, geminiKey);
             break;
           default:
             throw createProcessingError(
@@ -66,7 +113,7 @@ export async function analyzeRoute(req, res) {
         }
         return result;
       } catch (error) {
-        console.error(`[Backend Analyze] Error in provider ${provider}:`, error);
+        logger.error(`[Analyze] Provider ${provider} failed:`, error.message);
         throw error;
       }
     });
@@ -102,6 +149,11 @@ export async function analyzeRoute(req, res) {
 
     // Process results
     const { successfulResults, failedProviders } = processAnalysisResults(results, providers);
+    
+    // Log only if there are failures
+    if (failedProviders.length > 0) {
+      logger.warn(`[Analyze] Some providers failed: ${failedProviders.map(f => f.provider).join(', ')}`);
+    }
 
     // Merge web search links into results if they weren't included by AI
     // Extract supporting links from prompt if they exist

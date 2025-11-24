@@ -1,6 +1,7 @@
 import { performWebSearch } from '../services/webSearch.js';
 import { webSearchCache, generateCacheKey } from '../services/redisCache.js';
 import { createConfigurationError, ErrorCode } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 export async function webSearchRoute(req, res) {
   try {

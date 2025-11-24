@@ -1,5 +1,6 @@
 // Health check endpoint for monitoring service status
 import { analysisCache, webSearchCache } from '../services/redisCache.js';
+import { logger } from '../utils/logger.js';
 
 export async function healthRoute(req, res) {
   try {
@@ -12,7 +13,7 @@ export async function healthRoute(req, res) {
       cacheStatus = cachePing ? 'connected' : 'disconnected';
     } catch (error) {
       cacheStatus = 'disconnected';
-      console.error('Redis health check failed:', error);
+      logger.error('[Health Check] Redis failed:', error.message);
     }
     
     // Check API keys
@@ -64,6 +65,11 @@ export async function healthRoute(req, res) {
     const isHealthy = allApiKeysPresent && cacheStatus === 'connected';
     
     health.status = isHealthy ? 'healthy' : 'degraded';
+    
+    // Log only if unhealthy (to reduce noise)
+    if (!isHealthy) {
+      logger.warn(`[Health Check] Status: ${health.status} | API Keys: ${allApiKeysPresent ? 'OK' : 'MISSING'} | Cache: ${cacheStatus}`);
+    }
     
     // Return appropriate status code
     res.status(isHealthy ? 200 : 503).json(health);

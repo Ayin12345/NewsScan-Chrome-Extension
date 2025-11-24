@@ -2,6 +2,7 @@
 // This mirrors the functionality from src/utils/aiHandling.ts but runs server-side
 
 import { createAPIError, createNetworkError, createTimeoutError, createConfigurationError, retryOperation, ErrorCode, isRetryableError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 export async function fetchOpenAI(content, apiKey) {
   if (!apiKey) {
@@ -94,7 +95,34 @@ async function fetchGeminiWithModel(content, apiKey, model) {
   }
 
   return retryOperation(async () => {
-    console.time(`[Backend AI] Gemini ${model} request`);
+    logger.debug(`[Backend AI] Gemini ${model} request starting`);
+    const startTime = Date.now();
+    
+    // Prepare request body with grounding and JSON output configuration
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: content
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 6000,
+        // Enforce JSON output mode to prevent citation markers in JSON
+        responseMimeType: 'application/json'
+      },
+      // Enable Google Grounding Search for up-to-date information
+      // This allows the model to search Google when its knowledge cutoff (Jan 2025) is insufficient
+      tools: [{
+        googleSearchRetrieval: {
+          dynamicRetrievalConfig: {
+            mode: 'MODE_DYNAMIC', // Let the model decide when to search
+            dynamicThreshold: 0.7 // Confidence threshold for searching (optional)
+          }
+        }
+      }]
+    };
+    
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
@@ -102,20 +130,12 @@ async function fetchGeminiWithModel(content, apiKey, model) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: content
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 6000
-          }
-        })
+        body: JSON.stringify(requestBody)
       }
     );
-    console.timeEnd(`[Backend AI] Gemini ${model} request`);
+    
+    const duration = Date.now() - startTime;
+    logger.debug(`[Backend AI] Gemini ${model} request completed in ${duration}ms`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -157,6 +177,12 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 
     const data = await response.json();
     
+    // Log grounding metadata if present (for debugging, but we'll filter it out)
+    // Grounding metadata is in candidate.groundingMetadata, not at the top level
+    if (data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata) {
+      logger.debug(`[Backend AI] Gemini ${model} grounding metadata present (will be filtered)`);
+    }
+    
     if (data.candidates && data.candidates[0]) {
       const candidate = data.candidates[0];
       
@@ -178,20 +204,45 @@ async function fetchGeminiWithModel(content, apiKey, model) {
         );
       }
       
+      let responseText = null;
+      
+      // Extract text from response
       if (candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
-        return candidate.content.parts[0].text;
+        responseText = candidate.content.parts[0].text;
+      } else if (candidate.content && candidate.content.text) {
+        responseText = candidate.content.text;
       }
       
-      if (candidate.content && candidate.content.text) {
-        return candidate.content.text;
+      if (!responseText) {
+        throw createAPIError(
+          ErrorCode.INVALID_RESPONSE_FORMAT,
+          `Gemini ${model} response incomplete. Finish reason: ${candidate.finishReason || 'unknown'}`,
+          { provider: 'Gemini', model, finishReason: candidate.finishReason },
+          false
+        );
       }
       
-      throw createAPIError(
-        ErrorCode.INVALID_RESPONSE_FORMAT,
-        `Gemini ${model} response incomplete. Finish reason: ${candidate.finishReason || 'unknown'}`,
-        { provider: 'Gemini', model, finishReason: candidate.finishReason },
-        false
-      );
+      // Clean response text: remove any grounding metadata or citation markers that might have leaked in
+      // Even with responseMimeType: 'application/json', sometimes citations can appear in string values
+      let cleanedText = responseText.trim();
+      
+      // Remove grounding metadata if it somehow appears in the text (shouldn't happen with proper config, but just in case)
+      cleanedText = cleanedText.replace(/groundingMetadata[^}]*}/g, '');
+      cleanedText = cleanedText.replace(/groundingMetadata[^\]]*\]/g, '');
+      
+      // Remove citation markers like [1], [2] etc. from within JSON string values
+      // This carefully removes citations while preserving JSON structure
+      // Pattern: citation markers inside quoted strings
+      cleanedText = cleanedText.replace(/(?<="[^"]*)\s*\[\d+\]\s*(?=[^"]*")/g, ' ');
+      cleanedText = cleanedText.replace(/(?<="[^"]*)\[\d+\](?=[^"]*")/g, '');
+      
+      // Remove any markdown links that might appear: [text](url) - but preserve the text
+      cleanedText = cleanedText.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+      
+      // Clean up any double spaces created by removals
+      cleanedText = cleanedText.replace(/\s{2,}/g, ' ');
+      
+      return cleanedText;
     } else {
       throw createAPIError(
         ErrorCode.INVALID_RESPONSE_FORMAT,
@@ -204,30 +255,39 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 }
 
 export async function fetchGemini(content, apiKey) {
-  // Try Gemini 2.5 Flash first (faster, newer)
-  try {
-    return await fetchGeminiWithModel(content, apiKey, 'gemini-2.5-flash');
-  } catch (error) {
-    console.warn('[Backend AI] Gemini 2.5 Flash failed, trying backup model');
-    
-    // Fallback to Gemini 2.5 Flash Lite
+  // Try Gemini 2.5 Pro first (best for complex analysis with grounding)
+  // If Pro is not available, fall back to 2.5 Flash
+  const primaryModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+  let lastError = null;
+  
+  for (const model of primaryModels) {
     try {
-      return await fetchGeminiWithModel(content, apiKey, 'gemini-2.5-flash-lite');
-    } catch (backupError) {
-      console.error('[Backend AI] Both Gemini models failed:', backupError);
-      // Re-throw the original error if backup also fails
-      throw createAPIError(
-        ErrorCode.GEMINI_ERROR,
-        'Analysis failed due to AI model limitations. Please try again later.',
-        { 
-          originalError: error.message,
-          backupError: backupError.message,
-          provider: 'Gemini'
-        },
-        // Only retryable if both errors are retryable
-        isRetryableError(error) && isRetryableError(backupError)
-      );
+      return await fetchGeminiWithModel(content, apiKey, model);
+    } catch (error) {
+      lastError = error;
+      logger.warn(`[Backend AI] Gemini ${model} failed, trying next model`);
+      // Continue to next model
     }
+  }
+  
+  // Fallback to Gemini 2.5 Lite if primary models fail
+  logger.warn('[Backend AI] Primary Gemini models failed, trying backup model (2.5 Lite)');
+  try {
+    return await fetchGeminiWithModel(content, apiKey, 'gemini-2.5-lite');
+  } catch (backupError) {
+    logger.error('[Backend AI] All Gemini models failed');
+    // Re-throw the last primary error if backup also fails
+    throw createAPIError(
+      ErrorCode.GEMINI_ERROR,
+      'Analysis failed due to AI model limitations. Please try again later.',
+      { 
+        originalError: lastError?.message,
+        backupError: backupError.message,
+        provider: 'Gemini'
+      },
+      // Only retryable if both errors are retryable
+      isRetryableError(lastError) && isRetryableError(backupError)
+    );
   }
 }
 

@@ -9,6 +9,7 @@ import { validateAnalyzeRequest, validateWebSearchRequest } from './middleware/v
 import { analyzeRateLimiter, webSearchRateLimiter, generalRateLimiter } from './middleware/rateLimiting.js';
 import { extractErrorDetails, createNotFoundError, ErrorCode } from './utils/errors.js';
 import { validateEnvironment } from './utils/envValidator.js';
+import { logger } from './utils/logger.js';
 import timeout from 'express-timeout-handler';
 
 dotenv.config();
@@ -16,12 +17,15 @@ dotenv.config();
 try {
   validateEnvironment();
 } catch (error) {
-  console.error('Environment validation failed:', error.message);
+  logger.error('Environment validation failed:', error.message);
   process.exit(1);
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy for accurate IP addresses (important for Render/deployment)
+app.set('trust proxy', true);
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
@@ -48,7 +52,7 @@ const corsOptions = {
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
+      logger.warn(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -98,11 +102,15 @@ app.use(express.urlencoded({
 // Apply general rate limiting to all routes
 app.use(generalRateLimiter);
 
-// Request logging middleware
+// Request logging middleware - logs method, path, status, and duration
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  }
+  const startTime = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    logger.info(`${req.method} ${req.path} | ${res.statusCode} | ${duration}ms`);
+  });
+  
   next();
 });
 
@@ -132,13 +140,12 @@ app.use((err, req, res, next) => {
   const errorDetails = extractErrorDetails(err);
   
   // Enhanced error logging with context
-  console.error(`[Error Handler] ${errorDetails.type} (${errorDetails.code}):`, {
+  logger.error(`${errorDetails.type} (${errorDetails.code}):`, {
     message: errorDetails.message,
     path: req.path,
     method: req.method,
     status: errorDetails.status,
     isRetryable: errorDetails.isRetryable,
-    timestamp: new Date().toISOString(),
     requestId: req.body?.requestId,
     details: errorDetails.details,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
@@ -179,9 +186,9 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[NewsScan Backend] Server running on port ${PORT}`);
-  console.log(`[NewsScan Backend] Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`[NewsScan Backend] Allowed origins: ${allowedOrigins.join(', ')}`);
-  console.log(`[NewsScan Backend] Rate limiting: Enabled`);
-  console.log(`[NewsScan Backend] Caching: Enabled`);
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Allowed origins: ${allowedOrigins.join(', ')}`);
+  logger.info(`Rate limiting: Enabled`);
+  logger.info(`Caching: Enabled`);
 });
