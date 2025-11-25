@@ -177,7 +177,15 @@ async function fetchGeminiWithModel(content, apiKey, model) {
     // Log grounding metadata if present (for debugging, but we'll filter it out)
     // Grounding metadata is in candidate.groundingMetadata, not at the top level
     if (data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata) {
-      logger.debug(`[Backend AI] Gemini ${model} grounding metadata present (will be filtered)`);
+      const groundingMeta = data.candidates[0].groundingMetadata;
+      const chunks = groundingMeta.groundingChunks || [];
+      logger.info(`[Backend AI] Gemini ${model} used Google Grounding:`, {
+        webSearchQueries: groundingMeta.webSearchQueries || [],
+        groundingChunks: chunks.length,
+        supportScores: chunks.map(c => c.confidenceScore).filter(Boolean)
+      });
+    } else {
+      logger.warn(`[Backend AI] Gemini ${model} did NOT use Google Grounding - response may contain outdated information`);
     }
     
     if (data.candidates && data.candidates[0]) {

@@ -57,13 +57,16 @@ CRITICAL INSTRUCTION: If the content above is insufficient or seems incomplete, 
 
 IMPORTANT: The supporting_links array has been pre-populated with relevant verification sources and related articles found through web search.
 
-GROUNDING INSTRUCTIONS:
-- Use Google Search to verify current facts, names, dates, and recent events
-- If your knowledge cutoff (January 2025) is insufficient, search Google for up-to-date information
-- Verify official names, titles, and recent changes (e.g., department name changes, policy updates)
-- Do NOT include citation markers (like [1]) or URLs inside the JSON values
-- Do NOT include markdown links or citation indices in the JSON strings
-- Use the search tool to verify facts, but output only the raw data in clean JSON
+GROUNDING INSTRUCTIONS (CRITICAL - YOU MUST USE GOOGLE SEARCH):
+- BEFORE analyzing any names, titles, dates, or facts, you MUST use Google Search to verify they are current and accurate
+- Your knowledge cutoff is January 2025 - if the article mentions anything after that date or recent events, you MUST search Google
+- When you see names of officials, government positions, or organizations, you MUST search to verify current titles and positions
+- When you see dates or references to "recent" events, you MUST search to verify the timeline and current status
+- Example: If an article mentions "Transportation Secretary [Name]", you MUST search to verify who currently holds that position
+- Example: If an article references events from 2019 as "recent", you MUST search to verify if this is outdated information
+- Use the Google Search tool (it's available to you) to verify ALL factual claims before making credibility assessments
+- Do NOT rely on your training data for current information - always search first
+- After searching, use the verified information in your analysis but do NOT include citation markers in the JSON output
 
 CRITICAL RULES:
 1. SENTENCES: Every sentence must:
