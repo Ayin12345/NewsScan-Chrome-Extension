@@ -19,13 +19,16 @@ declare module '#imports' {
   export { useState, useCallback, useMemo, useEffect, useRef, useContext, useReducer } from 'react';
   export { fakeBrowser } from 'wxt/testing';
   export { useAnalysisState } from '../src/hooks/useAnalysisState';
+  export { useLayoutRefresh } from '../src/hooks/useLayoutRefresh';
   export { useMessageHandlers } from '../src/hooks/useMessageHandlers';
-  export { shouldSkipAutoAnalysis, shouldExpandSidebar, getProvidersFromEnvironment } from '../src/utils/analysisHelpers';
+  export { fetchOpenAI, fetchGemini } from '../src/utils/aiHandling';
+  export { createTimerFunctions, shouldSkipAutoAnalysis, shouldExpandSidebar, getProvidersFromEnvironment } from '../src/utils/analysisHelpers';
   export { getPageInfo, analyzeArticle, loadAnalysisForUrl } from '../src/utils/analysisOperations';
-  export { AnalysisResult } from '../src/utils/analysisProcessor';
-  export { callBackendAnalyze, callBackendWebSearch } from '../src/utils/backendClient';
+  export { cleanAndParseJSON, processAnalysisResults, AnalysisResult } from '../src/utils/analysisProcessor';
   export { handleGetPageInfo, handleAnalyzeArticle, handleGetTabState, handleResetTabState, handleSaveTabState, handleWebSearch, handleLoadAnalysisInTab, handleNavigateAndReopenSidebar, handlePreloadUrlAnalysis } from '../src/utils/messageHandlers';
   export { ANALYSIS_PROMPT, buildAnalysisPrompt } from '../src/utils/prompts';
   export { DEFAULTS, getStorage, setStorage, getMulti, InjectedSidebarPerDomainState, RecentAnalysis, StorageShape } from '../src/utils/storage';
-  export { getDefaultState, saveTabState, getTabState, deleteTabState, isTabBeingSetup, markTabAsBeingSetup, unmarkTabAsBeingSetup, cleanupTabStates, TabState } from '../src/utils/tabState';
+  export { getDefaultState, saveTabState, getTabState, deleteTabState, getUrlAnalysis, setUrlAnalysis, isTabBeingSetup, markTabAsBeingSetup, unmarkTabAsBeingSetup, cleanupUrlStorage, cleanupTabStates, TabState } from '../src/utils/tabState';
+  export { useChromeStorage } from '../src/utils/useChromeStorage';
+  export { generateSearchQuery, performWebSearch, testWebSearchLogging, WebSearchResponse } from '../src/utils/webSearch';
 }
