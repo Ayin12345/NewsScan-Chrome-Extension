@@ -1,23 +1,27 @@
 {
-  "name": "chrome-extension-starter",
+  "name": "newsscan",
   "version": "1.0.0",
-  "description": "Chrome Extension with React and TypeScript using CRXJS",
+  "description": "NewsScan - AI-powered news credibility analysis and fake news detection",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build"
+    "dev": "wxt",
+    "build": "wxt build",
+    "prepare": "wxt prepare",
+    "zip": "wxt zip",
+    "start": "cd backend && npm start"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@wxt-dev/module-react": "^1.1.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.21",
     "@types/chrome": "^0.0.253",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8"
+    "vite": "^5.0.8",
+    "wxt": "^0.20.7"
   }
-} 
+}

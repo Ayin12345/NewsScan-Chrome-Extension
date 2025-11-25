@@ -5,6 +5,12 @@
 .env.test.local
 .env.production.local
 
+# Documentation (private/internal)
+TESTING_GUIDE.md
+PRODUCTION_MUST_HAVE.md
+PRODUCTION_FUTURE.md
+DEPLOYMENT_GUIDE.md
+
 # Dependencies
 node_modules/
 npm-debug.log*

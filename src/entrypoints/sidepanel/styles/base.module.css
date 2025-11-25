@@ -1,0 +1,28 @@
+/* Base scaling variables */
+:root {
+  --min-spacing: 1rem;
+  --max-spacing: 2.5rem;
+  --content-max-width: 1200px;
+}
+
+.pageContainer {
+  min-height: 100vh;
+  padding: clamp(var(--min-spacing), 4vh, var(--max-spacing));
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 3vh, 2rem);
+}
+
+.contentSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 2vh, 1.5rem);
+  padding: clamp(1rem, 3vh, 2rem);
+}
+
+/* Utility class for sections that should expand to fill space */
+.expandable {
+  flex: 1;
+  min-height: 0;  /* Allows proper flex growing */
+} 
