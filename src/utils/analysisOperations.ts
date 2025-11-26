@@ -304,7 +304,10 @@ export async function analyzeArticle(
               failedProviders: failedProviders || []
             };
             
-            const updated = [newEntry, ...existing].slice(0, 10);
+            // Remove any existing entries with the same URL to avoid duplicates
+            const filtered = existing.filter((item: any) => item.url !== pageInfo.url);
+            // Add the new entry at the beginning and keep only the most recent 10
+            const updated = [newEntry, ...filtered].slice(0, 10);
             await setStorage('recentAnalyses', updated);
           } catch (storageError) {
             console.error('Error saving to recent analyses:', storageError);
