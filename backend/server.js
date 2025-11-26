@@ -25,7 +25,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Trust proxy for accurate IP addresses (important for Render/deployment)
-app.set('trust proxy', true);
+// Set to 1 to trust only the first proxy (Render's load balancer)
+// This prevents rate limiting bypass while still getting correct client IPs
+app.set('trust proxy', 1);
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
