@@ -386,7 +386,10 @@ function App() {
 
   // Auto-expand sidebar when analysis results are available
   useEffect(() => {
-    const shouldExpand = shouldExpandSidebar(state.analysis.length, state.isAnalyzing);
+    // Only expand if we have analysis AND we're not in any loading state
+    // This prevents expansion before loading screen clears
+    const isLoading = state.isAnalyzing || state.isDetectingPage || state.isPageLoading;
+    const shouldExpand = shouldExpandSidebar(state.analysis.length, state.isAnalyzing) && !isLoading;
     
     if (shouldExpand) {
       // Trigger expansion by sending a message to content script
@@ -401,8 +404,8 @@ function App() {
           });
         }
       });
-    } else if (state.analysis.length === 0 && !state.isAnalyzing) {
-      // Collapse when analysis is cleared
+    } else if (state.analysis.length === 0 && !isLoading) {
+      // Collapse when analysis is cleared and not loading
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
         if (currentTab?.id) {
@@ -415,7 +418,7 @@ function App() {
         }
       });
     }
-  }, [state.analysis.length, state.isAnalyzing]);
+  }, [state.analysis.length, state.isAnalyzing, state.isDetectingPage, state.isPageLoading]);
 
 
 

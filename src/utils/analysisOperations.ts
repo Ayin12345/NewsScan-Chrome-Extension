@@ -150,24 +150,28 @@ export async function analyzeArticle(
   if (!guardConditions.isManualTrigger) {
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
+    setters.setIsPageLoading(false);
     return;
   }
   
   if (guardConditions.isViewingFromRecent) {
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
+    setters.setIsPageLoading(false);
     return;
   }
   
   if (guardConditions.hasPreloadedAnalysis) {
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
+    setters.setIsPageLoading(false);
     return;
   }
   
   if (guardConditions.requiresManualTrigger && !guardConditions.isManualTrigger) {
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
+    setters.setIsPageLoading(false);
     return;
   }
   
@@ -177,6 +181,7 @@ export async function analyzeArticle(
     setters.setError('No page info found');
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
+    setters.setIsPageLoading(false);
     return;
   }
   
@@ -188,6 +193,7 @@ export async function analyzeArticle(
         setters.setError('No active tab found');
         setters.setIsAnalyzing(false);
         setters.setIsDetectingPage(false);
+        setters.setIsPageLoading(false);
         resolve();
         return;
       }
@@ -247,6 +253,8 @@ export async function analyzeArticle(
         console.error('[NewsScan] Analysis timeout - no response received');
         setters.setError('Analysis timed out. Please try again.');
         setters.setIsAnalyzing(false);
+        setters.setIsDetectingPage(false);
+        setters.setIsPageLoading(false);
         resolve();
       }, 60000); // 60 second timeout
 
@@ -263,6 +271,8 @@ export async function analyzeArticle(
           console.error('[NewsScan] Chrome runtime error:', chrome.runtime.lastError);
           setters.setError('Failed to communicate with background script. Please try reloading the extension.');
           setters.setIsAnalyzing(false);
+          setters.setIsDetectingPage(false);
+          setters.setIsPageLoading(false);
           resolve();
           return;
         }
@@ -271,6 +281,8 @@ export async function analyzeArticle(
           console.error('[NewsScan] Analysis failed:', response?.error);
           setters.setError(response?.error || 'Failed to get analysis response');
           setters.setIsAnalyzing(false);
+          setters.setIsDetectingPage(false);
+          setters.setIsPageLoading(false);
           resolve();
           return;
         }
@@ -278,9 +290,15 @@ export async function analyzeArticle(
         // Process the analysis results
         const { successfulResults, failedProviders } = response.data;
         
+        // Clear all loading states FIRST before setting analysis data
+        // This prevents race conditions where expansion happens before loading screen clears
+        setters.setIsAnalyzing(false);
+        setters.setIsDetectingPage(false);
+        setters.setIsPageLoading(false);
+        
+        // Then set the analysis data
         setters.setAnalysis(successfulResults);
         setters.setFailedProviders(failedProviders);
-        setters.setIsAnalyzing(false);
         setters.setHasAttemptedAnalysis(true);
         setters.setHasExistingAnalysis(true);
         setters.setShowButton(false);
