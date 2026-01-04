@@ -1,8 +1,3 @@
-export type InjectedSidebarPerDomainState = {
-  widthPx: number;
-  collapsed: boolean;
-};
-
 export interface RecentAnalysis {
   url: string;
   title: string;
@@ -16,22 +11,10 @@ export interface RecentAnalysis {
 }
 
 export interface StorageShape {
-  selectedPage: 'home' | 'settings';
-  sidepanelCollapsed: boolean;
-  injectedSidebarEnabled: boolean;
-  injectedSidebarDefaultWidthPx: number;
-  injectedSidebarStateByHost: Record<string, { widthPx: number; isCollapsed: boolean }>;
-  hasAttemptedAnalysis: boolean;
   recentAnalyses: RecentAnalysis[];
 }
 
 export const DEFAULTS: StorageShape = {
-  selectedPage: 'home',
-  sidepanelCollapsed: false,
-  injectedSidebarEnabled: false,
-  injectedSidebarDefaultWidthPx: 440,
-  injectedSidebarStateByHost: {},
-  hasAttemptedAnalysis: false,
   recentAnalyses: [],
 };
 

@@ -1,9 +1,7 @@
 import React from 'react';
 import styles from '../styles/App.module.css';
 
-interface AnalysisLoadingProps {}
-
-export const AnalysisLoadingState: React.FC<AnalysisLoadingProps> = () => (
+export const AnalysisLoadingState: React.FC = () => (
   <div className={styles.analysisLoadingState}>
     <div className={styles.analysisLoadingContent}>
       <h2 className={styles.analysisLoadingTitle}>
@@ -11,26 +9,6 @@ export const AnalysisLoadingState: React.FC<AnalysisLoadingProps> = () => (
       </h2>
       <p className={styles.analysisLoadingSubtitle}>
         Please wait while we process and evaluate this content
-      </p>
-      <div className={styles.modernSpinner}>
-        <div className={styles.spinnerRing}></div>
-        <div className={styles.spinnerRing}></div>
-        <div className={styles.spinnerRing}></div>
-      </div>
-    </div>
-  </div>
-);
-
-interface InitialLoadingProps {}
-
-export const InitialLoadingState: React.FC<InitialLoadingProps> = () => (
-  <div className={styles.analysisLoadingState}>
-    <div className={styles.analysisLoadingContent}>
-      <h2 className={styles.analysisLoadingTitle}>
-        Loading Article
-      </h2>
-      <p className={styles.analysisLoadingSubtitle}>
-        Please wait while we initialize the article
       </p>
       <div className={styles.modernSpinner}>
         <div className={styles.spinnerRing}></div>

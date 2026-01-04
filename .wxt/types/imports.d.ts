@@ -91,7 +91,7 @@ declare global {
   export type { AnalysisResult } from 'C:/Users/yinal/Fake News Reader/src/utils/analysisProcessor'
   import('C:/Users/yinal/Fake News Reader/src/utils/analysisProcessor')
   // @ts-ignore
-  export type { InjectedSidebarPerDomainState, RecentAnalysis, StorageShape } from 'C:/Users/yinal/Fake News Reader/src/utils/storage'
+  export type { RecentAnalysis, StorageShape } from 'C:/Users/yinal/Fake News Reader/src/utils/storage'
   import('C:/Users/yinal/Fake News Reader/src/utils/storage')
   // @ts-ignore
   export type { TabState } from 'C:/Users/yinal/Fake News Reader/src/utils/tabState'

@@ -1,5 +1,4 @@
 import { defineContentScript } from '#imports';
-import { getMulti, setStorage } from '../utils/storage';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -58,7 +57,13 @@ export default defineContentScript({
           console.log('[FNR] Toggle message received:', message);
         }
         
+        // Don't process sidebar toggle if document is hidden (user switched to another tab)
+        // Exception: allow if sidebar already exists (user might be switching back)
         const exists = !!document.getElementById('fake-news-reader-injected-sidebar');
+        if (document.hidden && !exists) {
+          return;
+        }
+        
         if (exists) {
           // If sidebar exists, check if we should keep it open or close it
           // For analysis loading, we want to keep it open
@@ -108,6 +113,11 @@ export default defineContentScript({
       
       // Handle expansion for analysis results
       if (message?.type === 'EXPAND_FOR_ANALYSIS') {
+        // Only process expansion if document is visible (user is viewing this tab)
+        if (document.hidden) {
+          return;
+        }
+        
         const shouldExpand = message.expanded;
         currentWidthPx = shouldExpand ? EXPANDED_WIDTH_PX : DEFAULT_WIDTH_PX;
         
@@ -168,6 +178,11 @@ export default defineContentScript({
     const transitionMs = mql.matches ? 0 : 160;
 
     function ensureInjected(forceShow: boolean) {
+      // Don't show sidebar if document is hidden (user switched to another tab)
+      if (document.hidden && !injectedRoot) {
+        return;
+      }
+      
       if (!injectedRoot) {
         createInjected();
       }
@@ -333,5 +348,19 @@ export default defineContentScript({
       injectedRoot.style.opacity = '1';
       applyBodyPadding();
     }
+    
+    // Handle visibility changes - hide sidebar when tab becomes hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && injectedRoot) {
+        // Don't remove sidebar, just hide it visually to prevent layout issues
+        // The sidebar will be properly handled when tab becomes visible again
+        injectedRoot.style.opacity = '0';
+        resetBodyPadding();
+      } else if (!document.hidden && injectedRoot) {
+        // Restore sidebar visibility when tab becomes visible
+        injectedRoot.style.opacity = '1';
+        applyLayout();
+      }
+    });
   },
 });

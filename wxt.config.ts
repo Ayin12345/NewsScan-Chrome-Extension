@@ -8,7 +8,7 @@ export default defineConfig({
     // Privacy policy URL - REQUIRED for Chrome Web Store submission
     // Update this URL after hosting your privacy policy
     // GitHub Pages option: https://ayin12345.github.io/fake-news-reader-extension/privacy-policy.html
-    privacy_policy: "https://ayin12345.github.io/fake-news-reader-extension/privacy-policy.html",
+    privacy_policy: "https://github.com/Ayin12345/fake-news-reader-extension/blob/main/PRIVACY_POLICY.md",
     permissions: [
       "storage",
       "scripting",

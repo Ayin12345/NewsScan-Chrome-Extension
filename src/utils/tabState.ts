@@ -4,13 +4,10 @@ export type TabState = {
   pageInfo: any;
   analysis: any[];
   failedProviders: string[];
-  showButton: boolean;
   isAnalyzing: boolean;
-  hasAttemptedAnalysis: boolean;
   isViewingFromRecent?: boolean;
   originalTabId?: number;
   hasPreloadedAnalysis?: boolean;
-  requiresManualTrigger?: boolean;
 };
 
 // In-memory tab state storage
@@ -24,9 +21,7 @@ export const getDefaultState = (): TabState => ({
   pageInfo: null,
   analysis: [],
   failedProviders: [],
-  showButton: true,
-  isAnalyzing: false,
-  hasAttemptedAnalysis: false
+  isAnalyzing: false
 });
 
 // Persistent tab state storage helpers

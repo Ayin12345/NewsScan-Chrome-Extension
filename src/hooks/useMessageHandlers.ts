@@ -8,19 +8,14 @@ interface MessageHandlerProps {
     setPageInfo: (value: PageInfo | null) => void;
     setAnalysis: (value: AnalysisResult[]) => void;
     setFailedProviders: (value: string[]) => void;
-    setShowButton: (value: boolean) => void;
     setIsAnalyzing: (value: boolean) => void;
     setIsDetectingPage: (value: boolean) => void;
-    setHasAttemptedAnalysis: (value: boolean) => void;
     setHasExistingAnalysis: (value: boolean) => void;
     setIsViewingFromRecent: (value: boolean) => void;
     setOriginalTabId: (value: number | undefined) => void;
     setHasPreloadedAnalysis: (value: boolean) => void;
-    setRequiresManualTrigger: (value: boolean) => void;
     setIsPageLoading: (value: boolean) => void;
     setIsManualTrigger: (value: boolean) => void;
-    setProviderStatuses: (value: Record<string, 'waiting' | 'analyzing' | 'complete' | 'failed'>) => void;
-    setSelectedPage: (value: 'home' | 'settings') => void;
     setError: (value: string) => void;
   };
 }
@@ -41,13 +36,10 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
         setters.setPageInfo(analysisData.pageInfo);
         setters.setAnalysis(analysisData.analysis || []);
         setters.setFailedProviders(analysisData.failedProviders || []);
-        setters.setShowButton(false);
-        setters.setHasAttemptedAnalysis(true);
         setters.setHasExistingAnalysis((analysisData.analysis || []).length > 0);
         setters.setIsViewingFromRecent(analysisData.isViewingFromRecent || false);
         setters.setOriginalTabId(analysisData.originalTabId);
         setters.setHasPreloadedAnalysis(true);
-        setters.setRequiresManualTrigger(false);
         
         // Reset the analysis trigger ref to prevent auto-analysis
         refs.analysisTriggeredRef.current = true;
@@ -58,26 +50,33 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
           return;
         }
         
+        // If already triggered, ignore duplicate messages (content script may retry)
+        if (state.isManualTrigger && (state.isAnalyzing || state.isPageLoading || state.isDetectingPage)) {
+          return;
+        }
+        
         setters.setIsManualTrigger(true);
         // Reset state for new analysis
         setters.setError('');
         setters.setAnalysis([]);
         setters.setFailedProviders([]);
-        setters.setShowButton(true);
         // Reset pageInfo to trigger fresh loading
         setters.setPageInfo(null);
+        // Clear any lingering loading states from previous attempts
+        setters.setIsPageLoading(false);
+        setters.setIsAnalyzing(false);
+        setters.setIsDetectingPage(false);
         // Reset analysis triggered ref to allow new analysis
         refs.analysisTriggeredRef.current = false;
       } else if (event.data?.type === 'TRIGGER_RESET') {
         // Reset state and ensure we go to welcome page
         resetState();
-        setters.setSelectedPage('home');
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [setters, refs]);
+  }, [setters, refs, state.hasPreloadedAnalysis, state.isViewingFromRecent, state.isManualTrigger, state.isAnalyzing, state.isPageLoading, state.isDetectingPage]);
 
   // Listen for messages from background script
   useEffect(() => {
@@ -87,15 +86,6 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
         if (!state.isViewingFromRecent) {
           setters.setIsManualTrigger(false);
         }
-      }
-
-      // Handle real-time provider updates
-      if (message.type === 'PROVIDER_UPDATE') {
-        const updated: Record<string, 'waiting' | 'analyzing' | 'complete' | 'failed'> = {
-          ...state.providerStatuses,
-          [message.provider]: message.status as 'waiting' | 'analyzing' | 'complete' | 'failed'
-        };
-        setters.setProviderStatuses(updated);
       }
 
       // Handle tab loading state updates
@@ -111,13 +101,12 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
     return () => chrome.runtime.onMessage.removeListener(handleMessages);
   }, [state.isViewingFromRecent, setters]);
 
-  // Helper function to reset state (would need to be passed in or defined elsewhere)
+  // Helper function to reset state
   const resetState = () => {
     setters.setError('');
     setters.setPageInfo(null);
     setters.setAnalysis([]);
     setters.setFailedProviders([]);
-    setters.setShowButton(true);
     setters.setIsAnalyzing(false);
     setters.setIsPageLoading(false);
     setters.setIsViewingFromRecent(false);
@@ -125,7 +114,6 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
     setters.setHasExistingAnalysis(false);
     setters.setIsManualTrigger(false);
     setters.setHasPreloadedAnalysis(false);
-    setters.setRequiresManualTrigger(false);
     
     // Reset the analysis trigger ref
     refs.analysisTriggeredRef.current = false;

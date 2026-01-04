@@ -5,7 +5,6 @@ export function shouldSkipAutoAnalysis(
   isViewingFromRecent: boolean,
   hasExistingAnalysis: boolean,
   hasPreloadedAnalysis: boolean,
-  requiresManualTrigger: boolean,
   pageUrl: string
 ): { shouldSkip: boolean; reason: string } {
   // Never auto-analyze unless extension icon was clicked
@@ -43,13 +42,12 @@ export function shouldSkipAutoAnalysis(
   }
 
   // Additional safeguards
-  if (isViewingFromRecent || hasExistingAnalysis || hasPreloadedAnalysis || (requiresManualTrigger && !isManualTrigger)) {
+  if (isViewingFromRecent || hasExistingAnalysis || hasPreloadedAnalysis) {
     return { 
       shouldSkip: true, 
       reason: isViewingFromRecent ? 'VIEWING_FROM_RECENT' : 
               hasExistingAnalysis ? 'HAS_EXISTING_ANALYSIS' :
-              hasPreloadedAnalysis ? 'HAS_PRELOADED_ANALYSIS' :
-              'REQUIRES_MANUAL_TRIGGER'
+              'HAS_PRELOADED_ANALYSIS'
     };
   }
 

@@ -26,6 +26,6 @@ declare module '#imports' {
   export { callBackendAnalyze, callBackendWebSearch } from '../src/utils/backendClient';
   export { handleGetPageInfo, handleAnalyzeArticle, handleGetTabState, handleResetTabState, handleSaveTabState, handleWebSearch, handleLoadAnalysisInTab, handleNavigateAndReopenSidebar, handlePreloadUrlAnalysis } from '../src/utils/messageHandlers';
   export { ANALYSIS_PROMPT, buildAnalysisPrompt } from '../src/utils/prompts';
-  export { DEFAULTS, getStorage, setStorage, getMulti, InjectedSidebarPerDomainState, RecentAnalysis, StorageShape } from '../src/utils/storage';
+  export { DEFAULTS, getStorage, setStorage, getMulti, RecentAnalysis, StorageShape } from '../src/utils/storage';
   export { getDefaultState, saveTabState, getTabState, deleteTabState, isTabBeingSetup, markTabAsBeingSetup, unmarkTabAsBeingSetup, cleanupTabStates, TabState } from '../src/utils/tabState';
 }

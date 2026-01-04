@@ -1,6 +1,6 @@
 import { PageInfo, AnalysisResult, FailedProvider } from '../types/analysis';
 import { getProvidersFromEnvironment } from './analysisHelpers';
-import { setStorage, getStorage } from './storage';
+import { getStorage, setStorage } from './storage';
 import { callBackendWebSearch } from './backendClient';
 import { buildAnalysisPrompt } from './prompts';
 
@@ -11,8 +11,6 @@ export async function getPageInfo(
     setPageInfo: (value: PageInfo | null) => void;
     setAnalysis: (value: AnalysisResult[]) => void;
     setFailedProviders: (value: FailedProvider[] | string[]) => void;
-    setShowButton: (value: boolean) => void;
-    setHasAttemptedAnalysis: (value: boolean) => void;
     setIsDetectingPage: (value: boolean) => void;
     setIsPageLoading: (value: boolean) => void;
   },
@@ -20,7 +18,6 @@ export async function getPageInfo(
     isViewingFromRecent: boolean;
     hasExistingAnalysis: boolean;
     hasPreloadedAnalysis: boolean;
-    requiresManualTrigger: boolean;
   },
   refs: {
     analysisTriggeredRef: React.MutableRefObject<boolean>;
@@ -41,19 +38,11 @@ export async function getPageInfo(
     return;
   }
 
-  // Don't get page info if this tab requires manual trigger (unless manually triggered)
-  if (guardConditions.requiresManualTrigger && !isManualTrigger) {
-    return;
-  }
-
   // Reset state
   setters.setError('');
   setters.setPageInfo(null);
   setters.setAnalysis([]);
   setters.setFailedProviders([]);
-  setters.setShowButton(true);
-  setters.setHasAttemptedAnalysis(true);
-  await setStorage('hasAttemptedAnalysis', true);
   
   // Only set isPageLoading initially - isDetectingPage will be set after page load
   setters.setIsPageLoading(true);
@@ -128,18 +117,15 @@ export async function analyzeArticle(
     setAnalysis: (value: AnalysisResult[]) => void;
     setFailedProviders: (value: FailedProvider[] | string[]) => void;
     setSelectedProvider: (value: string) => void;
-    setProviderStatuses: (value: Record<string, 'waiting' | 'analyzing' | 'complete' | 'failed'>) => void;
     setIsAnalyzing: (value: boolean) => void;
     setIsDetectingPage: (value: boolean) => void;
-    setHasAttemptedAnalysis: (value: boolean) => void;
     setHasExistingAnalysis: (value: boolean) => void;
-    setShowButton: (value: boolean) => void;
+    setIsPageLoading: (value: boolean) => void;
   },
   guardConditions: {
     isManualTrigger: boolean;
     isViewingFromRecent: boolean;
     hasPreloadedAnalysis: boolean;
-    requiresManualTrigger: boolean;
   }
 ): Promise<void> {
   // Set isAnalyzing immediately to maintain loading state continuity
@@ -162,13 +148,6 @@ export async function analyzeArticle(
   }
   
   if (guardConditions.hasPreloadedAnalysis) {
-    setters.setIsAnalyzing(false);
-    setters.setIsDetectingPage(false);
-    setters.setIsPageLoading(false);
-    return;
-  }
-  
-  if (guardConditions.requiresManualTrigger && !guardConditions.isManualTrigger) {
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
     setters.setIsPageLoading(false);
@@ -203,13 +182,7 @@ export async function analyzeArticle(
       setters.setFailedProviders([]);
       setters.setSelectedProvider('');
       
-      // Initialize provider statuses
       const providers = getProvidersFromEnvironment();
-      const initialStatuses: Record<string, 'waiting' | 'analyzing' | 'complete' | 'failed'> = {};
-      providers.forEach((provider: string) => {
-        initialStatuses[provider] = 'analyzing';
-      });
-      setters.setProviderStatuses(initialStatuses);
       
       // isAnalyzing is already set at the start of the function
       // Just ensure isDetectingPage is off
@@ -299,9 +272,7 @@ export async function analyzeArticle(
         // Then set the analysis data
         setters.setAnalysis(successfulResults);
         setters.setFailedProviders(failedProviders);
-        setters.setHasAttemptedAnalysis(true);
         setters.setHasExistingAnalysis(true);
-        setters.setShowButton(false);
 
         // Save to recent analyses if we have valid results
         if (successfulResults && successfulResults.length > 0 && pageInfo) {

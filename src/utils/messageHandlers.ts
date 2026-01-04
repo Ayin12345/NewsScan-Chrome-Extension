@@ -34,10 +34,8 @@ export async function handleGetPageInfo(message: any, sender: any, sendResponse:
     state = {
       ...state,
       pageInfo: pageInfo.data,
-      showButton: true,
       analysis: isSamePage ? state.analysis : [],
-      failedProviders: isSamePage ? state.failedProviders : [],
-      hasAttemptedAnalysis: false
+      failedProviders: isSamePage ? state.failedProviders : []
     };
     
     await saveTabState(tabId, state);
@@ -153,9 +151,7 @@ export async function handleAnalyzeArticle(message: any, sender: any, sendRespon
     
     state.analysis = backendResponse.data?.successfulResults || [];
     state.failedProviders = backendResponse.data?.failedProviders || [];
-    state.showButton = false;
     state.isAnalyzing = false;
-    state.hasAttemptedAnalysis = true;
     
     await saveTabState(tabId, state);
     
@@ -255,9 +251,7 @@ export async function handleSaveTabState(message: any, sender: any, sendResponse
       pageInfo: message.data.pageInfo,
       analysis: message.data.analysis,
       failedProviders: message.data.failedProviders,
-      showButton: message.data.showButton,
       isAnalyzing: message.data.isAnalyzing || false,
-      hasAttemptedAnalysis: message.data.hasAttemptedAnalysis || false,
       isViewingFromRecent: message.data.isViewingFromRecent || false,
       originalTabId: message.data.originalTabId
     });
@@ -319,9 +313,7 @@ export async function handleLoadAnalysisInTab(message: any, sender: any, sendRes
       pageInfo: analysisData.pageInfo,
       analysis: analysisData.analysis,
       failedProviders: analysisData.failedProviders,
-      showButton: false,
       isAnalyzing: false,
-      hasAttemptedAnalysis: true,
       isViewingFromRecent: analysisData.isViewingFromRecent || false,
       originalTabId: analysisData.originalTabId
     };

@@ -21,8 +21,6 @@ export interface AnalysisResult {
   };
 }
 
-export type ProviderStatus = 'waiting' | 'analyzing' | 'complete' | 'failed';
-
 export interface FailedProvider {
   provider: string;
   error: string;
@@ -35,7 +33,6 @@ export interface AppState {
   isAnalyzing: boolean;
   isDetectingPage: boolean;
   isPageLoading: boolean;
-  isLoadingAnalysis: boolean;
   
   // Data states
   error: string;
@@ -44,20 +41,14 @@ export interface AppState {
   failedProviders: FailedProvider[];
   
   // UI states
-  showButton: boolean;
   selectedProvider: string;
-  currentStep: number;
-  providerStatuses: Record<string, ProviderStatus>;
-  selectedPage: 'home' | 'settings';
   uiReady: boolean;
   
   // Analysis flow states
-  hasAttemptedAnalysis: boolean;
   autoStarted: boolean;
   hasExistingAnalysis: boolean;
   isManualTrigger: boolean;
   hasPreloadedAnalysis: boolean;
-  requiresManualTrigger: boolean;
   
   // Navigation states
   isViewingFromRecent: boolean;

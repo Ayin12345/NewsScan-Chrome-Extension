@@ -1,17 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AnalysisResults } from './components/AnalysisResults';
-import { AnalysisLoadingState, ErrorState, InitialLoadingState } from './components/LoadingStates';
+import { AnalysisLoadingState, ErrorState } from './components/LoadingStates';
 import { useAnalysisState } from '../../hooks/useAnalysisState';
 import { useMessageHandlers } from '../../hooks/useMessageHandlers';
 import { shouldSkipAutoAnalysis, shouldExpandSidebar } from '../../utils/analysisHelpers';
 import { getPageInfo, analyzeArticle, loadAnalysisForUrl } from '../../utils/analysisOperations';
-import { getMulti, setStorage } from '../../utils/storage';
 import styles from './styles/App.module.css';
 
 function App() {
   const [state, refs, setters] = useAnalysisState();
   const [isTabVisible, setIsTabVisible] = useState(true);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [tabStateChecked, setTabStateChecked] = useState(false);
   const { resetState } = useMessageHandlers({ state, refs, setters });
@@ -48,8 +46,6 @@ function App() {
         setPageInfo: setters.setPageInfo,
         setAnalysis: setters.setAnalysis,
         setFailedProviders: setters.setFailedProviders,
-        setShowButton: setters.setShowButton,
-        setHasAttemptedAnalysis: setters.setHasAttemptedAnalysis,
         setIsDetectingPage: setters.setIsDetectingPage,
         setIsPageLoading: setters.setIsPageLoading,
       },
@@ -57,7 +53,6 @@ function App() {
         isViewingFromRecent: state.isViewingFromRecent,
         hasExistingAnalysis: state.hasExistingAnalysis,
         hasPreloadedAnalysis: state.hasPreloadedAnalysis,
-        requiresManualTrigger: state.requiresManualTrigger,
       },
       {
         analysisTriggeredRef: refs.analysisTriggeredRef,
@@ -67,14 +62,11 @@ function App() {
     state.isViewingFromRecent,
     state.hasExistingAnalysis,
     state.hasPreloadedAnalysis,
-    state.requiresManualTrigger,
     refs.analysisTriggeredRef,
     setters.setError,
     setters.setPageInfo,
     setters.setAnalysis,
     setters.setFailedProviders,
-    setters.setShowButton,
-    setters.setHasAttemptedAnalysis,
     setters.setIsDetectingPage,
     setters.setIsPageLoading,
   ]);
@@ -89,18 +81,15 @@ function App() {
         setAnalysis: setters.setAnalysis,
         setFailedProviders: setters.setFailedProviders,
         setSelectedProvider: setters.setSelectedProvider,
-        setProviderStatuses: setters.setProviderStatuses,
         setIsAnalyzing: setters.setIsAnalyzing,
         setIsDetectingPage: setters.setIsDetectingPage,
-        setHasAttemptedAnalysis: setters.setHasAttemptedAnalysis,
         setHasExistingAnalysis: setters.setHasExistingAnalysis,
-        setShowButton: setters.setShowButton,
+        setIsPageLoading: setters.setIsPageLoading,
       },
       {
         isManualTrigger: state.isManualTrigger,
         isViewingFromRecent: state.isViewingFromRecent,
         hasPreloadedAnalysis: state.hasPreloadedAnalysis,
-        requiresManualTrigger: state.requiresManualTrigger,
       }
     );
   }, [
@@ -108,24 +97,45 @@ function App() {
     state.isManualTrigger,
     state.isViewingFromRecent,
     state.hasPreloadedAnalysis,
-    state.requiresManualTrigger,
     refs.requestIdRef,
     setters.setError,
     setters.setAnalysis,
     setters.setFailedProviders,
     setters.setSelectedProvider,
-    setters.setProviderStatuses,
     setters.setIsAnalyzing,
     setters.setIsDetectingPage,
-    setters.setHasAttemptedAnalysis,
     setters.setHasExistingAnalysis,
-    setters.setShowButton,
+    setters.setIsPageLoading,
   ]);
 
   // Track tab visibility for UI key changes
   useEffect(() => {
     const handleVisibilityChange = () => {
-      setIsTabVisible(!document.hidden);
+      const wasHidden = document.hidden;
+      setIsTabVisible(!wasHidden);
+      
+      // When tab becomes visible again, check if we need to expand sidebar
+      if (!wasHidden) {
+        const isLoading = state.isAnalyzing || state.isDetectingPage || state.isPageLoading;
+        const shouldExpand = shouldExpandSidebar(state.analysis.length, state.isAnalyzing) && !isLoading;
+        
+        if (shouldExpand) {
+          // Small delay to ensure tab is fully visible
+          setTimeout(() => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+              const currentTab = tabs[0];
+              if (currentTab?.id) {
+                chrome.tabs.sendMessage(currentTab.id, { 
+                  type: 'EXPAND_FOR_ANALYSIS',
+                  expanded: true 
+                }).catch(() => {
+                  // Ignore errors if content script isn't ready
+                });
+              }
+            });
+          }, 100);
+        }
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -133,7 +143,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [state.analysis.length, state.isAnalyzing, state.isDetectingPage, state.isPageLoading]);
 
   // Initialize UI
   useEffect(() => {
@@ -141,17 +151,8 @@ function App() {
     
     const initializeUI = async () => {
       try {
-        const { selectedPage, hasAttemptedAnalysis: storedHasAttempted } = await getMulti([
-          'selectedPage',
-          'hasAttemptedAnalysis',
-        ] as const);
-
         if (!mounted) return;
-
-        setters.setSelectedPage(selectedPage || 'home');
-        setters.setHasAttemptedAnalysis(storedHasAttempted || false);
         setters.setUiReady(true);
-        setIsInitializing(false);
         setIsReady(true);
       } catch (error) {
         console.error('UI initialization failed:', error);
@@ -162,7 +163,6 @@ function App() {
         setters.setIsDetectingPage(false);
         setters.setError('Failed to initialize. Please try again.');
         setters.setUiReady(true);
-        setIsInitializing(false);
         setIsReady(true);
       }
     };
@@ -172,11 +172,7 @@ function App() {
     return () => {
       mounted = false;
     };
-  }, [
-    setters.setSelectedPage,
-    setters.setHasAttemptedAnalysis,
-    setters.setUiReady,
-  ]);
+  }, [setters.setUiReady]);
 
   // Early-load background tab state to detect history/preloaded flows before any auto-start
   useEffect(() => {
@@ -206,13 +202,10 @@ function App() {
                 if (s.pageInfo) setters.setPageInfo(s.pageInfo);
                 if (Array.isArray(s.analysis)) setters.setAnalysis(s.analysis);
                 setters.setFailedProviders(s.failedProviders || []);
-                setters.setShowButton(false);
-                setters.setHasAttemptedAnalysis(true);
                 setters.setHasExistingAnalysis((s.analysis || []).length > 0);
                 setters.setIsViewingFromRecent(!!s.isViewingFromRecent);
                 setters.setOriginalTabId(s.originalTabId);
                 setters.setHasPreloadedAnalysis(!!s.hasPreloadedAnalysis);
-                setters.setRequiresManualTrigger(false);
                 // Prevent any auto-triggers
                 refs.analysisTriggeredRef.current = true;
               }
@@ -335,7 +328,6 @@ function App() {
             state.isViewingFromRecent,
             state.hasExistingAnalysis,
             state.hasPreloadedAnalysis,
-            state.requiresManualTrigger,
             state.pageInfo.url
           );
 
@@ -375,7 +367,6 @@ function App() {
     state.isManualTrigger,
     state.hasExistingAnalysis,
     state.hasPreloadedAnalysis,
-    state.requiresManualTrigger,
     handleAnalyzeArticle,
     setters.setError,
     setters.setIsAnalyzing,
@@ -390,6 +381,11 @@ function App() {
     // This prevents expansion before loading screen clears
     const isLoading = state.isAnalyzing || state.isDetectingPage || state.isPageLoading;
     const shouldExpand = shouldExpandSidebar(state.analysis.length, state.isAnalyzing) && !isLoading;
+    
+    // Only send expansion messages if the tab is visible (user is viewing the tab)
+    if (!isTabVisible) {
+      return;
+    }
     
     if (shouldExpand) {
       // Trigger expansion by sending a message to content script
@@ -418,7 +414,7 @@ function App() {
         }
       });
     }
-  }, [state.analysis.length, state.isAnalyzing, state.isDetectingPage, state.isPageLoading]);
+  }, [state.analysis.length, state.isAnalyzing, state.isDetectingPage, state.isPageLoading, isTabVisible]);
 
 
 
@@ -482,34 +478,28 @@ function App() {
 
   return (
     <div className={`${styles.container}`} key={isTabVisible ? 'visible' : 'hidden'}>
-      {state.selectedPage === 'home' && (
-        <>
-          {isLoading && <AnalysisLoadingState key="loading" />}
+      {isLoading && <AnalysisLoadingState key="loading" />}
 
-          {!isLoading && (
-            <div className={styles.content}>
-              {state.analysis.length > 0 ? (
-                <AnalysisResults 
-                  analysis={state.analysis}
-                  selectedProvider={state.selectedProvider}
-                  onProviderSelect={setters.setSelectedProvider}
-                  onNewAnalysis={handleNewAnalysis}
-                  isViewingFromRecent={state.isViewingFromRecent}
-                  onLoadAnalysisForUrl={handleLoadAnalysisForUrl}
-                />
-              ) : state.error ? (
-                <ErrorState
-                  error={state.error}
-                  onRetry={handleRetry}
-                  canRetry={!state.isViewingFromRecent}
-                />
-              ) : null}
-            </div>
-          )}
-        </>
+      {!isLoading && (
+        <div className={styles.content}>
+          {state.analysis.length > 0 ? (
+            <AnalysisResults 
+              analysis={state.analysis}
+              selectedProvider={state.selectedProvider}
+              onProviderSelect={setters.setSelectedProvider}
+              onNewAnalysis={handleNewAnalysis}
+              isViewingFromRecent={state.isViewingFromRecent}
+              onLoadAnalysisForUrl={handleLoadAnalysisForUrl}
+            />
+          ) : state.error ? (
+            <ErrorState
+              error={state.error}
+              onRetry={handleRetry}
+              canRetry={!state.isViewingFromRecent}
+            />
+          ) : null}
+        </div>
       )}
-
-      {state.selectedPage === 'settings' && null}
     </div>
   );
 }
