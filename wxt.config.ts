@@ -29,7 +29,7 @@ export default defineConfig({
     web_accessible_resources: [
       {
         resources: [
-          "sidebar.html",
+          "sidepanel.html",
           "chunks/*",
           "assets/*",
           "logo.png"
