@@ -302,7 +302,7 @@ export default defineContentScript({
       iframe.style.border = '0';
       iframe.style.width = '100%';
       iframe.style.height = '100%';
-      iframe.src = chrome.runtime.getURL('sidepanel.html');
+      iframe.src = chrome.runtime.getURL('sidebar.html');
       body.appendChild(iframe);
 
       // Wire close action to close sidebar

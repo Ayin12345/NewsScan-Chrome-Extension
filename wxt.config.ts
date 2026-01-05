@@ -5,7 +5,6 @@ export default defineConfig({
   srcDir: 'src',
   manifest: {
     name: "NewsScan",
-    privacy_policy: "https://github.com/Ayin12345/fake-news-reader-extension/blob/main/PRIVACY_POLICY.md",
     permissions: [
       "storage",
       "scripting",
@@ -29,7 +28,7 @@ export default defineConfig({
     web_accessible_resources: [
       {
         resources: [
-          "sidepanel.html",
+          "sidebar.html",
           "chunks/*",
           "assets/*",
           "logo.png"
