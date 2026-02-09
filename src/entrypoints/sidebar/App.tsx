@@ -174,6 +174,26 @@ function App() {
     };
   }, [setters.setUiReady]);
 
+  // Safeguard: If we're stuck in an invalid state (no loading, no results, no error) for too long, show an error
+  useEffect(() => {
+    const isLoading = state.isAnalyzing || state.isDetectingPage || state.isPageLoading;
+    const hasResults = state.analysis.length > 0;
+    const hasError = !!state.error;
+    
+    // Only run safeguard if we're in a bad state and UI is ready
+    if (!state.uiReady || isLoading || hasResults || hasError) {
+      return;
+    }
+    
+    // Give time for normal flow to complete - if we're still in bad state after 3s, set error
+    // The effect will be cancelled and re-run if state changes, so this only fires if truly stuck
+    const safeguardTimer = setTimeout(() => {
+      setters.setError('Analysis could not be started. Please try again.');
+    }, 3000);
+    
+    return () => clearTimeout(safeguardTimer);
+  }, [state.uiReady, state.isAnalyzing, state.isDetectingPage, state.isPageLoading, state.analysis.length, state.error, setters.setError]);
+
   // Early-load background tab state to detect history/preloaded flows before any auto-start
   useEffect(() => {
     let cancelled = false;
@@ -335,6 +355,16 @@ function App() {
             setters.setIsAnalyzing(false);
             setters.setIsPageLoading(false);
             setters.setIsDetectingPage(false);
+            
+            // Set appropriate error based on skip reason
+            if (skipCheck.reason === 'RESTRICTED_PAGE') {
+              setters.setError('This page cannot be analyzed (restricted page type).');
+            } else if (skipCheck.reason === 'NO_MANUAL_TRIGGER') {
+              // This shouldn't happen in normal flow - set error to make it visible
+              setters.setError('Analysis was not triggered. Please try clicking the extension icon again.');
+            }
+            // For other reasons (VIEWING_FROM_RECENT, HAS_EXISTING_ANALYSIS, HAS_PRELOADED_ANALYSIS)
+            // these are expected states, not errors
             return;
           }
           
@@ -460,10 +490,21 @@ function App() {
     });
   };
 
-  // Handle retry on error
+  // Handle retry on error - properly trigger a new analysis
   const handleRetry = () => {
     if (!state.isViewingFromRecent) {
-      handleGetPageInfo();
+      // Reset state for fresh analysis
+      setters.setError('');
+      setters.setAnalysis([]);
+      setters.setFailedProviders([]);
+      setters.setPageInfo(null);
+      setters.setIsManualTrigger(true);
+      setters.setHasPreloadedAnalysis(false);
+      setters.setHasExistingAnalysis(false);
+      refs.analysisTriggeredRef.current = false;
+      
+      // Start the analysis
+      handleGetPageInfo(true);
     }
   };
 
@@ -491,13 +532,13 @@ function App() {
               isViewingFromRecent={state.isViewingFromRecent}
               onLoadAnalysisForUrl={handleLoadAnalysisForUrl}
             />
-          ) : state.error ? (
+          ) : (
             <ErrorState
-              error={state.error}
+              error={state.error || 'Analysis could not be started. Please try again.'}
               onRetry={handleRetry}
               canRetry={!state.isViewingFromRecent}
             />
-          ) : null}
+          )}
         </div>
       )}
     </div>

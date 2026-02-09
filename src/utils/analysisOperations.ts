@@ -137,6 +137,7 @@ export async function analyzeArticle(
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
     setters.setIsPageLoading(false);
+    setters.setError('Analysis was not triggered properly. Please click the extension icon to start.');
     return;
   }
   
@@ -144,6 +145,7 @@ export async function analyzeArticle(
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
     setters.setIsPageLoading(false);
+    // This is expected when viewing history - not an error, just skip
     return;
   }
   
@@ -151,6 +153,7 @@ export async function analyzeArticle(
     setters.setIsAnalyzing(false);
     setters.setIsDetectingPage(false);
     setters.setIsPageLoading(false);
+    // This is expected when preloaded - not an error, just skip
     return;
   }
   
@@ -218,7 +221,7 @@ export async function analyzeArticle(
         webSearchResults = [];
       }
       
-      // Build prompt with web search results
+      // Build prompt with web search results (fallback for backward compatibility)
       const prompt = buildAnalysisPrompt(pageInfo.url, pageInfo.title, pageInfo.content, webSearchResults);
       
       // Add a timeout to prevent infinite loading
@@ -235,7 +238,12 @@ export async function analyzeArticle(
         type: 'ANALYZE_ARTICLE',
         tabId: currentTab.id,
         content: prompt,
-        providers: providers
+        providers: providers,
+        // Send individual components so backend can build provider-specific prompts
+        url: pageInfo.url,
+        title: pageInfo.title,
+        articleContent: pageInfo.content,
+        supportingLinks: webSearchResults
       }, async (response) => {
         clearTimeout(timeout); // Clear timeout when we get a response
         

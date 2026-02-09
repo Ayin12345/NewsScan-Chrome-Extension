@@ -100,9 +100,7 @@ async function fetchGeminiWithModel(content, apiKey, model) {
     const startTime = Date.now();
     logger.info(`[Backend AI] Gemini ${model} request starting`);
     
-    // Prepare request body with grounding configuration
-    // Note: Cannot use responseMimeType: 'application/json' with grounding tools
-    // We'll parse JSON from text response instead
+    // Prepare request body - NO grounding (it encourages fact-checking which we don't want)
     const requestBody = {
       contents: [{
         parts: [{
@@ -110,16 +108,11 @@ async function fetchGeminiWithModel(content, apiKey, model) {
         }]
       }],
       generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 6000
-        // Removed responseMimeType: 'application/json' because it's incompatible with grounding tools
-        // JSON will be parsed from text response using existing parsing logic
-      },
-      // Enable Google Grounding Search for up-to-date information
-      // This allows the model to search Google when its knowledge cutoff (Jan 2025) is insufficient
-      tools: [{
-        googleSearch: {}
-      }]
+        temperature: 0.1, // Very low for consistent, non-creative output
+        maxOutputTokens: 6000,
+        responseMimeType: 'application/json' // Now we can use JSON mode without grounding
+      }
+      // Grounding DISABLED - it makes Gemini try to verify facts instead of analyzing journalism
     };
     
     const response = await fetch(
@@ -176,19 +169,7 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 
     const data = await response.json();
     
-    // Log grounding metadata if present (for debugging, but we'll filter it out)
-    // Grounding metadata is in candidate.groundingMetadata, not at the top level
-    if (data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata) {
-      const groundingMeta = data.candidates[0].groundingMetadata;
-      const chunks = groundingMeta.groundingChunks || [];
-      logger.info(`[Backend AI] Gemini ${model} used Google Grounding:`, {
-        webSearchQueries: groundingMeta.webSearchQueries || [],
-        groundingChunks: chunks.length,
-        supportScores: chunks.map(c => c.confidenceScore).filter(Boolean)
-      });
-    } else {
-      logger.warn(`[Backend AI] Gemini ${model} did NOT use Google Grounding - response may contain outdated information`);
-    }
+    // Grounding is disabled - we want journalism analysis, not fact-checking
     
     if (data.candidates && data.candidates[0]) {
       const candidate = data.candidates[0];
@@ -262,9 +243,9 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 }
 
 export async function fetchGemini(content, apiKey) {
-  // Primary: Gemini 2.5 Flash (better quality, worth the extra ~5 seconds)
-  // Backup: Gemini 2.5 Flash-Lite (lightweight fallback)
-  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  // Primary: Gemini 2.5 Pro (best reasoning and accuracy - critical for credibility analysis)
+  // Backup: Gemini 2.5 Flash (faster fallback)
+  const models = ['gemini-2.5-pro', 'gemini-2.5-flash'];
   let lastError = null;
   const overallStartTime = Date.now();
   

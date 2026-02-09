@@ -62,8 +62,8 @@ export function useMessageHandlers({ state, refs, setters }: MessageHandlerProps
         setters.setFailedProviders([]);
         // Reset pageInfo to trigger fresh loading
         setters.setPageInfo(null);
-        // Clear any lingering loading states from previous attempts
-        setters.setIsPageLoading(false);
+        // Set loading state immediately to show spinner while we prepare
+        setters.setIsPageLoading(true);
         setters.setIsAnalyzing(false);
         setters.setIsDetectingPage(false);
         // Reset analysis triggered ref to allow new analysis

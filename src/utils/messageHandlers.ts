@@ -87,11 +87,15 @@ export async function handleAnalyzeArticle(message: any, sender: any, sendRespon
     }
     
     // Call backend API instead of direct API calls
+    // Pass individual components so backend can build provider-specific prompts
     const backendResponse = await callBackendAnalyze({
       prompt: message.content,
       providers: providers,
       requestId: Date.now(),
-      supportingLinks: supportingLinks
+      supportingLinks: message.supportingLinks || supportingLinks,
+      url: message.url,
+      title: message.title,
+      content: message.articleContent
     });
 
     if (!backendResponse.success) {

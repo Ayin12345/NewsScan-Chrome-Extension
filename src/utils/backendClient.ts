@@ -8,6 +8,10 @@ interface AnalyzeRequest {
   providers: string[];
   requestId?: number;
   supportingLinks?: string[];
+  // Individual components for provider-specific prompts
+  url?: string;
+  title?: string;
+  content?: string;
 }
 
 interface FailedProvider {

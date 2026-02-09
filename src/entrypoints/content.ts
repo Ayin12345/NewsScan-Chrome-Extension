@@ -99,14 +99,20 @@ export default defineContentScript({
             }, 100);
           } else {
             // If no preloaded analysis, trigger manual analysis when opened via extension icon
-            setTimeout(() => {
+            // Use a longer delay and retry mechanism to ensure React app is ready
+            const sendTrigger = (attempt = 1) => {
               const iframe = document.querySelector('#fake-news-reader-injected-sidebar iframe') as HTMLIFrameElement;
               if (iframe?.contentWindow) {
                 iframe.contentWindow.postMessage({
                   type: 'TRIGGER_NEW_ANALYSIS'
                 }, '*');
+              } else if (attempt < 3) {
+                // Retry if iframe not ready
+                setTimeout(() => sendTrigger(attempt + 1), 100);
               }
-            }, 50);
+            };
+            // Initial delay to let iframe load, then retry if needed
+            setTimeout(() => sendTrigger(1), 150);
           }
         }
       }
