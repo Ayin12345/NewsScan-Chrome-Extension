@@ -35,19 +35,20 @@ CRITICAL RULES:
    - impact MUST clearly explain why that quote increases or decreases credibility
 Return ONLY the JSON object with no additional text`;
 
-// Gemini prompt (focused on critical journalism analysis)
-export const GEMINI_PROMPT = `You are a skeptical media critic. Analyze this article's journalism quality. Return ONLY valid JSON.
+// Gemini prompt (balanced journalism analysis)
+export const GEMINI_PROMPT = `You are a fair journalism analyst. Evaluate this article's quality. Return ONLY valid JSON.
 
-BE CRITICAL. Every article has weaknesses. You MUST identify:
-- Potential biases in quoted experts (based on their affiliations or interests)
-- One-sided perspectives or missing counterarguments
-- Opinion presented as fact, or speculation not clearly labeled
-- Missing context that readers would need
-- Unanswered questions the article should have addressed
+TODAY'S DATE: {currentDate}. 
 
-Also note strengths: named sources, multiple perspectives, factual backing.
+EVALUATE:
+- Source quality: Are sources named and credible? Direct quotes add authenticity.
+- Balance: Multiple perspectives, or one-sided reporting?
+- Clarity: Facts vs opinion clearly separated?
+- Completeness: Any important missing context?
 
-DO NOT fact-check. Accept all names, dates, claims as written. Critique the JOURNALISM, not the facts.
+Be fair and balanced. Most news articles score 60-95. Only score below 50 for serious journalistic failures. Always provide reasons as to why you docked off points as well as a overall reason as to why the article was good and what it did well at.
+Evaluate journalistic side of article instead of fact-checking the article.
+Sentences must have proper grammar and punctuation.
 
 ARTICLE:
 URL: {url}
@@ -56,10 +57,10 @@ CONTENT: {content}
 
 {
   "credibility_score": (1-100),
-  "credibility_summary": "3-4 sentences. Start with strengths, then concerns. What biases exist? What's missing?",
-  "reasoning": "Specific critique of sources, balance, and journalistic weaknesses.",
+  "credibility_summary": "3-4 sentences. What did the article do well? What could be improved?",
+  "reasoning": "Balanced analysis of strengths and areas for improvement. Critique and areas the article excell in as well.",
   "evidence_sentences": [
-    { "quote": "exact quote from article", "impact": "why this raises or lowers credibility" }
+    { "quote": "exact quote from article", "impact": "why this affects credibility" }
   ],
   "supporting_links": []
 }
@@ -79,7 +80,12 @@ export function buildOpenAIPrompt(url, title, content, supportingLinks = []) {
 }
 
 export function buildGeminiPrompt(url, title, content, supportingLinks = []) {
+  // Get current date dynamically
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
   return GEMINI_PROMPT
+    .replace(/{currentDate}/g, currentDate)
     .replace(/{url}/g, url)
     .replace(/{title}/g, title)
     .replace(/{content}/g, content)
