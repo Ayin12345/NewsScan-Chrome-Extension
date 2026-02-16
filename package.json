@@ -1,6 +1,6 @@
 {
   "name": "newsscan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "NewsScan - AI-powered news credibility analysis and fake news detection",
   "type": "module",
   "scripts": {
