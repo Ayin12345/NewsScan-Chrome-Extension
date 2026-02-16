@@ -100,7 +100,9 @@ async function fetchGeminiWithModel(content, apiKey, model) {
     const startTime = Date.now();
     logger.info(`[Backend AI] Gemini ${model} request starting`);
     
-    // Prepare request body - NO grounding (it encourages fact-checking which we don't want)
+    // Enable Google Search grounding so Gemini has current world knowledge
+    // (e.g. who current leaders are, recent events) while the prompt steers it
+    // toward journalism analysis rather than fact-checking.
     const requestBody = {
       contents: [{
         parts: [{
@@ -108,11 +110,12 @@ async function fetchGeminiWithModel(content, apiKey, model) {
         }]
       }],
       generationConfig: {
-        temperature: 0.1, // Very low for consistent, non-creative output
-        maxOutputTokens: 6000,
-        responseMimeType: 'application/json' // Now we can use JSON mode without grounding
-      }
-      // Grounding DISABLED - it makes Gemini try to verify facts instead of analyzing journalism
+        temperature: 0.1,
+        maxOutputTokens: 6000
+      },
+      tools: [{
+        googleSearch: {}
+      }]
     };
     
     const response = await fetch(
@@ -169,7 +172,7 @@ async function fetchGeminiWithModel(content, apiKey, model) {
 
     const data = await response.json();
     
-    // Grounding is disabled - we want journalism analysis, not fact-checking
+    // Google Search grounding is enabled for current world knowledge
     
     if (data.candidates && data.candidates[0]) {
       const candidate = data.candidates[0];
@@ -210,9 +213,11 @@ async function fetchGeminiWithModel(content, apiKey, model) {
         );
       }
       
-      // Clean response text: remove any grounding metadata or citation markers that might have leaked in
-      // Even with responseMimeType: 'application/json', sometimes citations can appear in string values
+      // Clean response text: strip markdown code fences, grounding metadata, and citation markers
       let cleanedText = responseText.trim();
+      
+      // Strip markdown code fences (```json ... ``` or ``` ... ```)
+      cleanedText = cleanedText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
       
       // Remove grounding metadata if it somehow appears in the text (shouldn't happen with proper config, but just in case)
       cleanedText = cleanedText.replace(/groundingMetadata[^}]*}/g, '');

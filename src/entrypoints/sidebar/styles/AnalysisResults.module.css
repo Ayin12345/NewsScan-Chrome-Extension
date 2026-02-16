@@ -16,7 +16,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--score-gradient), rgba(255, 255, 255, 0.95));
-  padding: 25px 20px 15px 20px;
+  padding: clamp(8px, 2vh, 25px) 20px clamp(6px, 1.5vh, 15px) 20px;
   position: relative;
   overflow: hidden;
   border-bottom: 1px solid #e8eaed;
@@ -38,10 +38,10 @@
   border-radius: 16px;
 }
 
-/* Large Hero Score Ring */
+/* Large Hero Score Ring - scales with viewport height */
 .scoreRing {
-  width: 160px;
-  height: 160px;
+  width: clamp(90px, 16vh, 160px);
+  height: clamp(90px, 16vh, 160px);
   border-radius: 50%;
   background: conic-gradient(
     from -90deg,
@@ -61,8 +61,8 @@
 .scoreRing::before {
   content: '';
   position: absolute;
-  width: 130px;
-  height: 130px;
+  width: 81.25%;
+  height: 81.25%;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   backdrop-filter: blur(10px);
@@ -70,8 +70,8 @@
 
 /* Empty Score Ring for Very Low Scores */
 .scoreRingEmpty {
-  width: 160px;
-  height: 160px;
+  width: clamp(90px, 16vh, 160px);
+  height: clamp(90px, 16vh, 160px);
   border-radius: 50%;
   background: rgba(232, 234, 237, 0.3);
   border: 3px solid var(--score-color);
@@ -86,15 +86,15 @@
 .scoreRingEmpty::before {
   content: '';
   position: absolute;
-  width: 130px;
-  height: 130px;
+  width: 81.25%;
+  height: 81.25%;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   backdrop-filter: blur(10px);
 }
 
 .scoreValueEmpty {
-  font-size: 48px;
+  font-size: clamp(28px, 5vh, 48px);
   font-weight: 800;
   color: var(--score-color);
   position: relative;
@@ -104,7 +104,7 @@
 }
 
 .scoreValue {
-  font-size: 48px;
+  font-size: clamp(28px, 5vh, 48px);
   font-weight: 800;
   color: var(--score-color);
   position: relative;
@@ -114,25 +114,25 @@
 }
 
 .scoreLabel {
-  font-size: 18px;
+  font-size: clamp(13px, 2vh, 18px);
   font-weight: 600;
   color: var(--score-color);
-  margin-top: 16px;
+  margin-top: clamp(6px, 1.5vh, 16px);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .scoreRange {
-  font-size: 14px;
+  font-size: clamp(11px, 1.5vh, 14px);
   color: #5f6368;
-  margin-top: 8px;
+  margin-top: clamp(2px, 0.8vh, 8px);
   font-weight: 500;
 }
 
 .pageTitle {
-  margin-top: 10px;
-  font-size: 16px;
+  margin-top: clamp(4px, 1vh, 10px);
+  font-size: clamp(12px, 1.6vh, 16px);
   font-weight: 600;
   color: #202124;
   text-align: center;
@@ -168,7 +168,7 @@
 .statsBar {
   display: flex;
   justify-content: space-around;
-  padding: 20px;
+  padding: clamp(8px, 1.8vh, 20px) clamp(12px, 2vw, 20px);
   background: #f8f9fa;
   border-bottom: 1px solid #e8eaed;
 }
@@ -182,14 +182,14 @@
 }
 
 .statValue {
-  font-size: 24px;
+  font-size: clamp(16px, 2.5vh, 24px);
   font-weight: 700;
   color: #202124;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .statLabel {
-  font-size: 12px;
+  font-size: clamp(9px, 1.3vh, 12px);
   color: #5f6368;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -219,11 +219,11 @@
 
 .navTab {
   flex: 1;
-  padding: 20px 24px;
+  padding: clamp(10px, 2vh, 20px) clamp(12px, 2vw, 24px);
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 15px;
+  font-size: clamp(12px, 1.6vh, 15px);
   font-weight: 600;
   color: #5f6368;
   transition: all 0.3s ease;
@@ -254,7 +254,7 @@
 /* Content Area */
 .contentArea {
   flex: 1;
-  padding: 20px 24px 44px 24px; /* add a bit more bottom padding inside the scroll area */
+  padding: clamp(12px, 2vh, 20px) clamp(16px, 2vw, 24px) 44px clamp(16px, 2vw, 24px);
   overflow-y: auto;
   animation: slideIn 0.4s ease-out;
   word-wrap: break-word;
@@ -273,7 +273,7 @@
 .summaryCard {
   background: linear-gradient(135deg, rgba(26, 115, 232, 0.05), rgba(255, 255, 255, 0.95));
   border-radius: 16px;
-  padding: 32px;
+  padding: clamp(16px, 3vh, 32px);
   border-left: 4px solid var(--score-color);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }

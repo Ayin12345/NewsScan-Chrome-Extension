@@ -5,8 +5,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node -r dotenv/config server.js",
+    "dev": "node --watch -r dotenv/config server.js",
     "build": "echo 'No build step required for Node.js backend'"
   },
   "dependencies": {

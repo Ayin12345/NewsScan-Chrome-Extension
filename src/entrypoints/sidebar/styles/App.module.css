@@ -211,7 +211,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 40px 20px 120px;
+  padding: clamp(20px, 5vh, 40px) 20px clamp(60px, 12vh, 120px);
 }
 
 .analysisErrorContent {
@@ -220,17 +220,17 @@
 }
 
 .analysisErrorTitle {
-  font-size: 30px;
+  font-size: clamp(22px, 4vh, 30px);
   font-weight: 600;
   color: #dc2626;
-  margin-bottom: 15px;
+  margin-bottom: clamp(8px, 1.5vh, 15px);
   animation: fadeInUp 0.6s ease-out;
 }
 
 .analysisErrorSubtitle {
-  font-size: 14px;
+  font-size: clamp(12px, 1.6vh, 14px);
   color: #6b7280;
-  margin-bottom: 32px;
+  margin-bottom: clamp(16px, 3vh, 32px);
   animation: fadeInUp 0.6s ease-out 0.2s both;
 }
 
@@ -271,7 +271,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 40px 20px 120px; /* keep loading UI away from bottom button area */
+  padding: clamp(20px, 5vh, 40px) 20px clamp(60px, 12vh, 120px);
 }
 
 .analysisLoadingContent {
@@ -280,25 +280,25 @@
 }
 
 .analysisLoadingTitle {
-  font-size: 30px;
+  font-size: clamp(22px, 4vh, 30px);
   font-weight: 600;
   color: #1a73e8;
-  margin-bottom: 15px;
+  margin-bottom: clamp(8px, 1.5vh, 15px);
   animation: fadeInUp 0.6s ease-out;
 }
 
 .analysisLoadingSubtitle {
-  font-size: 14px;
+  font-size: clamp(12px, 1.6vh, 14px);
   color: #5f6368;
-  margin-bottom: 32px;
+  margin-bottom: clamp(16px, 3vh, 32px);
   animation: fadeInUp 0.6s ease-out 0.2s both;
 }
 
 .modernSpinner {
   position: relative;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 24px;
+  width: clamp(40px, 7vh, 60px);
+  height: clamp(40px, 7vh, 60px);
+  margin: 0 auto clamp(12px, 2.5vh, 24px);
 }
 
 .spinnerRing {

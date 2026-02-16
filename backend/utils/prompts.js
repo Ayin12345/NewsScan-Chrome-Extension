@@ -35,19 +35,29 @@ CRITICAL RULES:
    - impact MUST clearly explain why that quote increases or decreases credibility
 Return ONLY the JSON object with no additional text`;
 
-// Gemini prompt (balanced journalism analysis)
-export const GEMINI_PROMPT = `You are a fair journalism analyst. Evaluate this article's quality. Return ONLY valid JSON.
+// Gemini prompt (balanced journalism analysis with grounding for current context)
+export const GEMINI_PROMPT = `You are a fair journalism analyst. Evaluate this article's JOURNALISTIC QUALITY. Return ONLY valid JSON.
 
-TODAY'S DATE: {currentDate}. 
+TODAY'S DATE: {currentDate}.
 
-EVALUATE:
+IMPORTANT — USE GOOGLE SEARCH FOR CURRENT CONTEXT:
+You have access to Google Search. Use it to confirm who currently holds political offices, what recent events have occurred, and any other real-world context needed to understand the article. Do NOT treat current political figures or recent events as outdated or from "a previous era" — verify via search first. Your role is to evaluate journalism quality, NOT to fact-check claims against your training data.
+
+EVALUATE JOURNALISM QUALITY:
 - Source quality: Are sources named and credible? Direct quotes add authenticity.
 - Balance: Multiple perspectives, or one-sided reporting?
 - Clarity: Facts vs opinion clearly separated?
 - Completeness: Any important missing context?
+- Structure: Is the article well-organized and clearly written?
 
-Be fair and balanced. Most news articles score 60-95. Only score below 50 for serious journalistic failures. Always provide reasons as to why you docked off points as well as a overall reason as to why the article was good and what it did well at.
-Evaluate journalistic side of article instead of fact-checking the article.
+SCORING GUIDELINES:
+- Most legitimate news articles from reputable outlets score 60-95.
+- Only score below 50 for serious journalistic failures (fabrication, extreme bias, no sources).
+- Always explain what points were docked and why, and what the article did well.
+- Do NOT dock points because the article covers controversial or political topics.
+- Do NOT dock points based on whether you agree with the article's subject matter.
+
+Evaluate the journalistic craft of the article — do NOT fact-check its claims.
 Sentences must have proper grammar and punctuation.
 
 ARTICLE:
@@ -58,14 +68,15 @@ CONTENT: {content}
 {
   "credibility_score": (1-100),
   "credibility_summary": "3-4 sentences. What did the article do well? What could be improved?",
-  "reasoning": "Balanced analysis of strengths and areas for improvement. Critique and areas the article excell in as well.",
+  "reasoning": "Balanced analysis of strengths and areas for improvement. Critique and areas the article excels in as well.",
   "evidence_sentences": [
     { "quote": "exact quote from article", "impact": "why this affects credibility" }
   ],
   "supporting_links": []
 }
 
-Return 3-6 quotes. Return ONLY JSON.`;
+CRITICAL: Do NOT include citation markers like [1], [2] or markdown links in the JSON values.
+Return 3-6 quotes. Return ONLY the JSON object.`;
 
 // Function to build prompts with article data
 export function buildOpenAIPrompt(url, title, content, supportingLinks = []) {

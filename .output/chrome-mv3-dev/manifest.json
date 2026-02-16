@@ -1,32 +1,38 @@
 {
   "manifest_version": 3,
-  "name": "newsscan",
+  "name": "NewsScan",
   "description": "NewsScan - AI-powered news credibility analysis and fake news detection",
   "version": "1.0.0",
+  "icons": {
+    "16": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "permissions": [
     "storage",
     "scripting",
     "activeTab",
-    "tabs",
-    "sidePanel"
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>",
     "http://localhost/*"
   ],
   "action": {
-    "default_title": "Open NewsScan"
-  },
-  "side_panel": {
-    "default_path": "sidepanel.html"
+    "default_title": "Open NewsScan",
+    "default_icon": {
+      "16": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+    }
   },
   "web_accessible_resources": [
     {
       "resources": [
-        "sidepanel.html",
+        "sidebar.html",
         "chunks/*",
         "assets/*",
-        "logo.svg"
+        "logo.png"
       ],
       "matches": [
         "<all_urls>"
