@@ -192,5 +192,5 @@ app.listen(PORT, () => {
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Allowed origins: ${allowedOrigins.join(', ')}`);
   logger.info(`Rate limiting: Enabled`);
-  logger.info(`Caching: Enabled`);
+  logger.info(`Caching: ${process.env.REDIS_URL?.trim() ? 'Redis configured (see logs for connect status)' : 'disabled (no REDIS_URL)'}`);
 });

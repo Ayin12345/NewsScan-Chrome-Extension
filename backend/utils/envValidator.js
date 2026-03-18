@@ -4,8 +4,8 @@ export function validateEnvironment() {
     'GEMINI_API_KEY',
     'GOOGLE_API_KEY',
     'GOOGLE_SEARCH_ENGINE_ID',
-    'REDIS_URL'
   ];
+  // REDIS_URL is optional — invalid or missing Redis only disables caching
 
   const missing = required.filter(key => !process.env[key]);
 

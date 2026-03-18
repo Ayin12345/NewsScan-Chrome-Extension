@@ -104,13 +104,18 @@ async function fetchGeminiWithModel(content, apiKey, model) {
     // (e.g. who current leaders are, recent events) while the prompt steers it
     // toward journalism analysis rather than fact-checking.
     const requestBody = {
+      systemInstruction: {
+        parts: [{
+          text: 'For any time-sensitive or breaking story (news, sports, disasters, policy, markets, etc.): use Google Search on the topic before claiming an outcome is pending, unverified, or that reporting is "premature." If search is unclear, score journalistic quality only—do not invent that reality lags the article. Never use fabrication or hoax for normal hedged reporting unless search shows a clear factual error.'
+        }]
+      },
       contents: [{
         parts: [{
           text: content
         }]
       }],
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0.25,
         maxOutputTokens: 6000
       },
       tools: [{

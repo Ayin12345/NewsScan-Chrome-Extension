@@ -1,19 +1,20 @@
 // Health check endpoint for monitoring service status
-import { analysisCache, webSearchCache } from '../services/redisCache.js';
+import { analysisCache, isRedisActive, redisExpected } from '../services/redisCache.js';
 import { logger } from '../utils/logger.js';
 
 export async function healthRoute(req, res) {
   try {
-    // Check Redis connection
-    let cacheStatus = 'unknown';
+    let cacheStatus = redisExpected ? 'unavailable' : 'disabled';
     let cachePing = false;
-    
-    try {
-      cachePing = await analysisCache.ping();
-      cacheStatus = cachePing ? 'connected' : 'disconnected';
-    } catch (error) {
-      cacheStatus = 'disconnected';
-      logger.error('[Health Check] Redis failed:', error.message);
+
+    if (isRedisActive()) {
+      try {
+        cachePing = await analysisCache.ping();
+        cacheStatus = cachePing ? 'connected' : 'unavailable';
+      } catch (error) {
+        cacheStatus = 'unavailable';
+        logger.warn('[Health Check] Redis ping failed:', error.message);
+      }
     }
     
     // Check API keys
@@ -45,7 +46,8 @@ export async function healthRoute(req, res) {
         apiKeys: apiKeysStatus,
         cache: {
           status: cacheStatus,
-          redis: cachePing
+          redis: cachePing,
+          required: false
         },
         memory: memoryInfo,
         server: {
@@ -62,16 +64,15 @@ export async function healthRoute(req, res) {
       apiKeysStatus.google &&
       apiKeysStatus.googleSearchEngineId;
     
-    const isHealthy = allApiKeysPresent && cacheStatus === 'connected';
-    
+    // Redis optional — only API keys gate "healthy" for monitors
+    const isHealthy = allApiKeysPresent;
+
     health.status = isHealthy ? 'healthy' : 'degraded';
-    
-    // Log only if unhealthy (to reduce noise)
+
     if (!isHealthy) {
       logger.warn(`[Health Check] Status: ${health.status} | API Keys: ${allApiKeysPresent ? 'OK' : 'MISSING'} | Cache: ${cacheStatus}`);
     }
-    
-    // Return appropriate status code
+
     res.status(isHealthy ? 200 : 503).json(health);
   } catch (error) {
     res.status(503).json({

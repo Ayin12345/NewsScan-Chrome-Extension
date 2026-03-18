@@ -1,153 +1,183 @@
-// Redis cache implementation for production scalability
-// Migrated from in-memory cache to support multiple concurrent users
+// Redis cache — optional. Invalid/missing REDIS_URL or connection failures never crash the API.
 
 import Redis from 'ioredis';
 import crypto from 'crypto';
 import { logger } from '../utils/logger.js';
 
-// Sanitize Redis URL - remove spaces, extra characters, and decode URL encoding
+const redisState = { client: null };
+
 function sanitizeRedisUrl(url) {
-  if (!url) return 'redis://localhost:6379';
-  
-  // Trim whitespace
-  let sanitized = url.trim();
-  
-  // Remove redis-cli -u prefix (including URL-encoded versions)
-  sanitized = sanitized.replace(/^redis-cli\s+-u\s+/i, ''); // Remove "redis-cli -u "
-  sanitized = sanitized.replace(/^redis-cli\s+/i, ''); // Remove "redis-cli "
-  sanitized = sanitized.replace(/^%20-u%20/i, ''); // Remove URL-encoded " -u "
-  sanitized = sanitized.replace(/^%20-%20/i, ''); // Remove URL-encoded " - "
-  
-  // Remove URL-encoded spaces (%20) and other common issues
-  sanitized = sanitized.replace(/^%20[-_]?%20?/i, ''); // Remove leading %20-%20 or %20_%20
-  sanitized = sanitized.replace(/^[-_\s]+/i, ''); // Remove leading dashes, underscores, spaces
-  sanitized = sanitized.replace(/\s+$/i, ''); // Remove trailing spaces
-  
-  // Decode URL encoding if present
+  if (!url || !String(url).trim()) return null;
+
+  let sanitized = String(url).trim();
+  sanitized = sanitized.replace(/^redis-cli\s+-u\s+/i, '');
+  sanitized = sanitized.replace(/^redis-cli\s+/i, '');
+  sanitized = sanitized.replace(/^%20-u%20/i, '');
+  sanitized = sanitized.replace(/^%20-%20/i, '');
+  sanitized = sanitized.replace(/^%20[-_]?%20?/i, '');
+  sanitized = sanitized.replace(/^[-_\s]+/i, '');
+  sanitized = sanitized.replace(/\s+$/i, '');
+
   try {
     sanitized = decodeURIComponent(sanitized);
-    // After decoding, check again for redis-cli prefix
     sanitized = sanitized.replace(/^redis-cli\s+-u\s+/i, '');
     sanitized = sanitized.replace(/^redis-cli\s+/i, '');
-  } catch (e) {
-    // If decoding fails, use as-is
+  } catch {
+    /* keep sanitized as-is */
   }
-  
-  // Ensure it starts with redis:// or rediss://
+
   if (!sanitized.match(/^rediss?:\/\//i)) {
-    logger.warn('Redis URL does not start with redis:// or rediss://, using default');
-    return 'redis://localhost:6379';
+    return null;
   }
-  
+
+  try {
+    const u = new URL(sanitized);
+    if (!u.hostname) return null;
+  } catch {
+    return null;
+  }
+
   return sanitized;
 }
 
-// Get and sanitize Redis URL
-const redisUrl = sanitizeRedisUrl(process.env.REDIS_URL);
+function resolveRedisUrl() {
+  const raw = process.env.REDIS_URL;
+  const sanitized = sanitizeRedisUrl(raw);
+  if (!sanitized) {
+    if (raw && String(raw).trim()) {
+      logger.warn('[Redis] REDIS_URL is missing or invalid — API runs without cache.');
+    } else {
+      logger.info('[Redis] REDIS_URL not set — API runs without cache.');
+    }
+    return null;
+  }
+  const masked = sanitized.replace(/:[^:@]+@/, ':****@');
+  logger.debug(`[Redis] Using URL: ${masked}`);
+  return sanitized;
+}
 
-// Log sanitized URL for debugging (hide password)
-if (process.env.REDIS_URL) {
-  const maskedUrl = redisUrl.replace(/:[^:@]+@/, ':****@');
-  logger.debug(`[Redis] Original URL length: ${process.env.REDIS_URL.length}, Sanitized: ${maskedUrl}`);
-  
-  // Check if password might contain @ symbol (needs URL encoding)
-  const urlMatch = redisUrl.match(/^rediss?:\/\/(?:([^:]+):([^@]+)@)?(.+)$/);
-  if (urlMatch && urlMatch[2] && urlMatch[2].includes('@')) {
-    logger.warn('[Redis] WARNING: Password contains @ symbol. It should be URL-encoded as %40 in the connection URL.');
+const redisUrl = resolveRedisUrl();
+/** True if REDIS_URL was valid enough to attempt a connection */
+export const redisExpected = Boolean(redisUrl);
+
+if (redisUrl) {
+  try {
+    const client = new Redis(redisUrl, {
+      lazyConnect: true,
+      connectTimeout: 8000,
+      maxRetriesPerRequest: 2,
+      retryStrategy(times) {
+        if (times > 5) return null;
+        return Math.min(times * 200, 2000);
+      },
+    });
+    redisState.client = client;
+    client.on('error', (err) => {
+      logger.error('[Redis] connection error:', err.message);
+    });
+    client.on('connect', () => {
+      logger.info('[Redis] connected');
+    });
+    client.connect().catch((err) => {
+      logger.warn('[Redis] initial connect failed — continuing without cache:', err.message);
+      try {
+        client.disconnect();
+      } catch {
+        /* ignore */
+      }
+      redisState.client = null;
+    });
+  } catch (err) {
+    logger.warn('[Redis] could not create client — continuing without cache:', err.message);
+    redisState.client = null;
   }
 }
 
-// Create Redis client
-const redis = new Redis(redisUrl, {
-  retryStrategy: (times) => {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-  maxRetriesPerRequest: 3,
-});
-
-// Handle Redis connection errors
-redis.on('error', (err) => {
-  logger.error('Redis connection error:', err);
-});
-
-redis.on('connect', () => {
-  logger.info('Redis connected successfully');
-});
+export function isRedisActive() {
+  return redisState.client != null && redisState.client.status !== 'end';
+}
 
 export class RedisCache {
+  _c() {
+    return redisState.client;
+  }
+
   async set(key, value, ttlMs = 3600000) {
+    const client = this._c();
+    if (!client || client.status === 'end') return;
     try {
-      await redis.setex(key, Math.floor(ttlMs / 1000), JSON.stringify(value));
+      await client.setex(key, Math.floor(ttlMs / 1000), JSON.stringify(value));
     } catch (error) {
-      logger.error('Redis set error:', error);
-      throw error;
+      logger.warn('[Redis] set failed (request still succeeds):', error.message);
     }
   }
-  
+
   async get(key) {
+    const client = this._c();
+    if (!client || client.status === 'end') return null;
     try {
-      const data = await redis.get(key);
+      const data = await client.get(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      logger.error('Redis get error:', error);
-      return null; // Return null on error to allow fallback behavior
+      logger.warn('[Redis] get failed:', error.message);
+      return null;
     }
   }
 
   async delete(key) {
+    const client = this._c();
+    if (!client || client.status === 'end') return;
     try {
-      await redis.del(key);
+      await client.del(key);
     } catch (error) {
-      logger.error('Redis delete error:', error);
+      logger.warn('[Redis] delete failed:', error.message);
     }
   }
 
   async clear() {
+    const client = this._c();
+    if (!client || client.status === 'end') return;
     try {
-      await redis.flushdb();
+      await client.flushdb();
     } catch (error) {
-      logger.error('Redis clear error:', error);
+      logger.warn('[Redis] clear failed:', error.message);
     }
   }
-  
+
   async getStats() {
+    const client = this._c();
+    if (!client || client.status === 'end') {
+      return { info: null, keyspace: null };
+    }
     try {
-      const info = await redis.info('stats');
-      const keyspace = await redis.info('keyspace');
+      const info = await client.info('stats');
+      const keyspace = await client.info('keyspace');
       return { info, keyspace };
     } catch (error) {
-      logger.error('Redis stats error:', error);
+      logger.warn('[Redis] stats failed:', error.message);
       return { info: null, keyspace: null };
     }
   }
 
-  // Health check method
   async ping() {
+    const client = this._c();
+    if (!client || client.status === 'end') return false;
     try {
-      const result = await redis.ping();
+      const result = await client.ping();
       return result === 'PONG';
-    } catch (error) {
+    } catch {
       return false;
     }
   }
 }
 
-// Create cache instances
-export const analysisCache = new RedisCache();
-export const webSearchCache = new RedisCache();
+const shared = new RedisCache();
+export const analysisCache = shared;
+export const webSearchCache = shared;
 
-// Generate cache key from request data (moved from cache.js)
 export function generateCacheKey(type, data) {
-  // Create a deterministic string from the data
-  const keyData = JSON.stringify({
-    type,
-    ...data
-  });
-  
-  // Generate hash
+  const keyData = JSON.stringify({ type, ...data });
   return crypto.createHash('sha256').update(keyData).digest('hex');
 }
 
-// Export Redis client for graceful shutdown
-export { redis };
+export const redis = redisState;

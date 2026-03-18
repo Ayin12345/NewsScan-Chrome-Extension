@@ -35,30 +35,31 @@ CRITICAL RULES:
    - impact MUST clearly explain why that quote increases or decreases credibility
 Return ONLY the JSON object with no additional text`;
 
-// Gemini prompt (balanced journalism analysis with grounding for current context)
-export const GEMINI_PROMPT = `You are a fair journalism analyst. Evaluate this article's JOURNALISTIC QUALITY. Return ONLY valid JSON.
+// Gemini prompt — journalism quality; avoid false "fabrication" when recency / grounding lags
+export const GEMINI_PROMPT = `You are a fair journalism analyst. Evaluate this article's JOURNALISTIC QUALITY only. Return ONLY valid JSON.
 
-TODAY'S DATE: {currentDate}.
+CURRENT MOMENT (stories from today or yesterday often describe events that already occurred in the real world): {currentDateTime}
+Calendar date: {currentDate}.
 
-IMPORTANT — USE GOOGLE SEARCH FOR CURRENT CONTEXT:
-You have access to Google Search. Use it to confirm who currently holds political offices, what recent events have occurred, and any other real-world context needed to understand the article. Do NOT treat current political figures or recent events as outdated or from "a previous era" — verify via search first. Your role is to evaluate journalism quality, NOT to fact-check claims against your training data.
+=== GOOGLE SEARCH — RECENT & BREAKING NEWS ===
+You have Google Search. Whenever the article depends on what is happening NOW or VERY RECENTLY (breaking news, sports results, disasters, policy moves, markets, conflicts, trials, product launches, scientific findings, weather, any dated outcome or status):
+1. Run a targeted search on the main subject (e.g. headline keywords + date or "latest") BEFORE you claim something "has not happened yet," is "premature," "unverified," "still unfolding," or similar.
+2. If search confirms the situation the article describes, treat that reporting as normal journalism — not fabrication.
+3. If search is empty, slow, or ambiguous, do NOT invent that the event is still pending or the article is ahead of reality. Default: judge writing, sourcing, and structure; do not punish because you lack confirmation.
+4. Hedged or analytical language ("on track," "expected to," "sources say," "breaking," "reports indicate") is standard news — never call it fabrication or misleading unless search proves a concrete factual error (wrong party, wrong date, wrong figure).
+
+=== NEVER DO THIS ===
+- Do NOT accuse the article of fabrication, hoax, or intentional deception for ordinary reporting on fast-moving or controversial topics.
+- Do NOT lower the score because your knowledge is stale or search returned little — score journalistic quality, not your certainty about the world.
+- Use search for time-sensitive claims; do not rely on training cutoff alone to dispute the article.
 
 EVALUATE JOURNALISM QUALITY:
-- Source quality: Are sources named and credible? Direct quotes add authenticity.
-- Balance: Multiple perspectives, or one-sided reporting?
-- Clarity: Facts vs opinion clearly separated?
-- Completeness: Any important missing context?
-- Structure: Is the article well-organized and clearly written?
+Source quality, balance, clarity (fact vs opinion), structure, completeness.
 
-SCORING GUIDELINES:
-- Most legitimate news articles from reputable outlets score 60-95.
-- Only score below 50 for serious journalistic failures (fabrication, extreme bias, no sources).
-- Always explain what points were docked and why, and what the article did well.
-- Do NOT dock points because the article covers controversial or political topics.
-- Do NOT dock points based on whether you agree with the article's subject matter.
-
-Evaluate the journalistic craft of the article — do NOT fact-check its claims.
-Sentences must have proper grammar and punctuation.
+SCORING:
+- Solid reporting from credible outlets: typically 70–92.
+- Below 55 only for clear journalistic failure — not because you disagree with or cannot verify breaking details.
+- Controversial or political content is not a reason to score low.
 
 ARTICLE:
 URL: {url}
@@ -67,15 +68,15 @@ CONTENT: {content}
 
 {
   "credibility_score": (1-100),
-  "credibility_summary": "3-4 sentences. What did the article do well? What could be improved?",
-  "reasoning": "Balanced analysis of strengths and areas for improvement. Critique and areas the article excels in as well.",
+  "credibility_summary": "3-4 sentences on strengths and improvements. Do not claim events are unfinished unless search supports it.",
+  "reasoning": "Balanced strengths and weaknesses. Mention search only if you used it for recency; do not guess real-world status from silence.",
   "evidence_sentences": [
     { "quote": "exact quote from article", "impact": "why this affects credibility" }
   ],
   "supporting_links": []
 }
 
-CRITICAL: Do NOT include citation markers like [1], [2] or markdown links in the JSON values.
+CRITICAL: No [1] citation markers or markdown links inside JSON string values.
 Return 3-6 quotes. Return ONLY the JSON object.`;
 
 // Function to build prompts with article data
@@ -91,11 +92,17 @@ export function buildOpenAIPrompt(url, title, content, supportingLinks = []) {
 }
 
 export function buildGeminiPrompt(url, title, content, supportingLinks = []) {
-  // Get current date dynamically
   const now = new Date();
-  const currentDate = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  
+  const currentDate = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const currentDateTime = now.toISOString();
+
   return GEMINI_PROMPT
+    .replace(/{currentDateTime}/g, currentDateTime)
     .replace(/{currentDate}/g, currentDate)
     .replace(/{url}/g, url)
     .replace(/{title}/g, title)
