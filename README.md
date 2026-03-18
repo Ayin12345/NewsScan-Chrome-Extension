@@ -1,7 +1,7 @@
 # NewsScan
 
 AI-powered news credibility analysis and fake news detection Chrome extension. Built with React, TypeScript, and WXT.
-NewsScan 1.1.0 is available on Chrome Extensions under the name "NewsScan"
+NewsScan 1.1.1 is available on Chrome Extensions under the name "NewsScan"
 
 ## Setup
 
